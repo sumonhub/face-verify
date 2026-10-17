@@ -7,6 +7,7 @@ import android.graphics.Paint
 import androidx.camera.core.ImageProxy
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
+import com.sumonlogs.faceverify.core.engine.FaceAlignment
 import com.sumonlogs.faceverify.core.engine.FaceObservation
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
@@ -26,22 +27,21 @@ class FaceCropper {
     }
 
     /**
-     * Similarity-aligns the face so the eyes land on the ArcFace 112×112 template points, which is
-     * how MobileFaceNet's training data was aligned. Falls back to a square box crop without landmarks.
+     * Aligns the face onto the ArcFace 112×112 template with a least-squares fit over every landmark
+     * ML Kit found (eyes, nose, mouth corners), as both models were trained. Falls back to a square
+     * box crop when the eyes are missing.
      */
     fun align(upright: Bitmap, face: FaceObservation, size: Int): IntArray {
-        val scale = size / TEMPLATE_SIZE
         val matrix = Matrix()
-        val leftEye = face.leftEye
-        val rightEye = face.rightEye
-        if (leftEye != null && rightEye != null) {
-            // The person's right eye appears on the image's left.
-            val src = floatArrayOf(rightEye.x, rightEye.y, leftEye.x, leftEye.y)
-            val dst = floatArrayOf(
-                TEMPLATE_IMAGE_LEFT_EYE_X * scale, TEMPLATE_EYE_Y * scale,
-                TEMPLATE_IMAGE_RIGHT_EYE_X * scale, TEMPLATE_EYE_Y * scale,
+        val similarity = FaceAlignment.estimate(face, size)
+        if (similarity != null) {
+            matrix.setValues(
+                floatArrayOf(
+                    similarity.a, -similarity.b, similarity.tx,
+                    similarity.b, similarity.a, similarity.ty,
+                    0f, 0f, 1f,
+                ),
             )
-            matrix.setPolyToPoly(src, 0, dst, 0, 2)
         } else {
             val side = max(face.width, face.bottom - face.top)
             val s = size / side
@@ -70,12 +70,5 @@ class FaceCropper {
         }
         if (scaled !== upright) scaled.recycle()
         return bytes
-    }
-
-    private companion object {
-        const val TEMPLATE_SIZE = 112f
-        const val TEMPLATE_IMAGE_LEFT_EYE_X = 38.2946f
-        const val TEMPLATE_IMAGE_RIGHT_EYE_X = 73.5318f
-        const val TEMPLATE_EYE_Y = 51.6f
     }
 }

@@ -133,6 +133,9 @@ private fun FacePrompt.texts(): Pair<Int, Int> {
         FacePrompt.TurnedAway -> R.string.face_hint_turned to keepInOval
         FacePrompt.Tilted -> R.string.face_hint_tilted to keepInOval
         FacePrompt.EyesClosed -> R.string.face_hint_eyes to keepInOval
+        FacePrompt.TooDark -> R.string.face_hint_too_dark to keepInOval
+        FacePrompt.TooBright -> R.string.face_hint_too_bright to keepInOval
+        FacePrompt.Blurry -> R.string.face_hint_blurry to R.string.face_capture_sub
         FacePrompt.Blink -> R.string.face_challenge_blink to R.string.face_sub_checking_live
         FacePrompt.TurnLeft -> R.string.face_challenge_left to R.string.face_sub_checking_live
         FacePrompt.TurnRight -> R.string.face_challenge_right to R.string.face_sub_checking_live

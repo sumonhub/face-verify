@@ -47,6 +47,9 @@ class MlKitFaceDetector {
             rightEyeOpen = rightEyeOpenProbability,
             leftEye = getLandmark(FaceLandmark.LEFT_EYE)?.position?.let { Point(it.x, it.y) },
             rightEye = getLandmark(FaceLandmark.RIGHT_EYE)?.position?.let { Point(it.x, it.y) },
+            noseBase = getLandmark(FaceLandmark.NOSE_BASE)?.position?.let { Point(it.x, it.y) },
+            mouthLeft = getLandmark(FaceLandmark.MOUTH_LEFT)?.position?.let { Point(it.x, it.y) },
+            mouthRight = getLandmark(FaceLandmark.MOUTH_RIGHT)?.position?.let { Point(it.x, it.y) },
             trackingId = trackingId,
         )
     }

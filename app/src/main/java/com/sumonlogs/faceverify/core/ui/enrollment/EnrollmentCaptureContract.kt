@@ -33,9 +33,9 @@ data class EnrollmentCaptureState(
     val showHelp: Boolean = false,
     /** Bumped on retry so the camera is rebound. */
     val attempt: Int = 0,
-) : UiState {
-    val progress: Float get() = captured.size.toFloat() / EnrollPose.entries.size
-}
+    /** 0..1 over the whole enrollment, for the oval ring. */
+    val progress: Float = 0f,
+) : UiState
 
 sealed interface EnrollmentCaptureEffect : UiEffect {
     data class Enrolled(val face: EnrolledFace) : EnrollmentCaptureEffect

@@ -4,16 +4,19 @@ import kotlinx.coroutines.flow.Flow
 
 /** The face feature's public API. Every method is safe to call; verify() never throws. */
 interface FaceVerifier {
-    /** Everyone enrolled on this device, oldest first. Updates after enroll and delete. */
+    /**
+     * Everyone enrolled on this device, oldest first, for every model. Only people enrolled with the
+     * active model ([FaceModelSettings]) can be recognised. Updates after enroll and delete.
+     */
     val enrolledFaces: Flow<List<EnrolledFace>>
 
-    /** Opens the face-check camera flow and returns who was recognised, if anyone. */
+    /** Opens the face-check camera flow and returns who was recognised among the active model's people. */
     suspend fun verify(): FaceMatchResult
 
     suspend fun deleteEnrollment(id: String)
 }
 
-data class EnrolledFace(val id: String, val name: String, val enrolledAtMillis: Long)
+data class EnrolledFace(val id: String, val name: String, val enrolledAtMillis: Long, val modelId: String)
 
 enum class FaceFailure {
     NoFace,

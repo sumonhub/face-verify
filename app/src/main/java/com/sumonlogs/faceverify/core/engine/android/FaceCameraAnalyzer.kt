@@ -5,7 +5,6 @@ import android.os.SystemClock
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.sumonlogs.faceverify.core.engine.FaceConfig
-import com.sumonlogs.faceverify.core.engine.FaceEmbedder
 import com.sumonlogs.faceverify.core.engine.FaceFrame
 import com.sumonlogs.faceverify.core.engine.FaceObservation
 
@@ -16,7 +15,6 @@ import com.sumonlogs.faceverify.core.engine.FaceObservation
 class FaceCameraAnalyzer(
     private val detector: MlKitFaceDetector,
     private val cropper: FaceCropper,
-    private val embedder: FaceEmbedder,
     private val config: FaceConfig,
     private val onFrame: (FaceFrame) -> Unit,
     private val onError: (Throwable) -> Unit,
@@ -52,7 +50,7 @@ class FaceCameraAnalyzer(
         private fun uprightBitmap(): Bitmap = upright ?: cropper.upright(proxy).also { upright = it }
 
         override fun alignedFace(face: FaceObservation): IntArray =
-            cropper.align(uprightBitmap(), face, embedder.inputSize)
+            cropper.align(uprightBitmap(), face, ALIGN_SIZE)
 
         override fun selfieJpeg(): ByteArray =
             cropper.jpeg(uprightBitmap(), config.selfieMaxSide, config.selfieJpegQuality)
@@ -61,5 +59,10 @@ class FaceCameraAnalyzer(
             upright?.recycle()
             upright = null
         }
+    }
+
+    private companion object {
+        /** Both face models take 112×112 crops. */
+        const val ALIGN_SIZE = 112
     }
 }

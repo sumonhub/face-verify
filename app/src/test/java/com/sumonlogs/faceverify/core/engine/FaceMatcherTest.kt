@@ -47,9 +47,18 @@ class FaceMatcherTest {
     }
 
     @Test
-    fun `best template of a person wins`() {
-        val probe = floatArrayOf(1f, 0f)
-        assertTrue(FaceMatcher.score(probe, listOf(floatArrayOf(0f, 1f), floatArrayOf(1f, 0.1f))) > 0.99f)
+    fun `a person is scored against the average of their templates, not the best one`() {
+        // One odd template that happens to point at the probe must not decide the match on its own.
+        val person = listOf(floatArrayOf(0f, 1f), floatArrayOf(0f, 1f), floatArrayOf(1f, 0f))
+        val score = FaceMatcher.score(floatArrayOf(1f, 0f), person)
+        assertTrue("score was $score", score < 0.5f)
+    }
+
+    @Test
+    fun `centroid of identical vectors is that vector, normalised`() {
+        val c = FaceMatcher.centroid(listOf(floatArrayOf(3f, 4f), floatArrayOf(6f, 8f)))
+        assertEquals(0.6f, c[0], 1e-6f)
+        assertEquals(0.8f, c[1], 1e-6f)
     }
 
     @Test

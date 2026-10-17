@@ -15,4 +15,8 @@ fun QualityIssue.hintRes(): Int = when (this) {
     QualityIssue.TurnedAway -> R.string.face_hint_turned
     QualityIssue.Tilted -> R.string.face_hint_tilted
     QualityIssue.EyesClosed -> R.string.face_hint_eyes
+    QualityIssue.TooDark -> R.string.face_hint_too_dark
+    QualityIssue.TooBright -> R.string.face_hint_too_bright
+    QualityIssue.Blurry -> R.string.face_hint_blurry
+    QualityIssue.FaceChanged -> R.string.face_hint_face_changed
 }

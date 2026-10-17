@@ -1,7 +1,11 @@
 package com.sumonlogs.faceverify.harness
 
+import com.sumonlogs.faceverify.core.api.ActiveFaceModel
 import com.sumonlogs.faceverify.core.api.EnrolledFace
+import com.sumonlogs.faceverify.core.api.FaceDiagnostics
+import com.sumonlogs.faceverify.core.api.FaceFailure
 import com.sumonlogs.faceverify.core.api.FaceMatchResult
+import com.sumonlogs.faceverify.core.api.FaceModelSettings
 import com.sumonlogs.faceverify.core.api.FaceVerifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -10,40 +14,100 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Plain harness state holder: runs the FaceVerifier calls and exposes their outcome. */
-class HarnessController(private val verifier: FaceVerifier) {
+/** Who was really in front of the camera, as the tester says. */
+sealed interface CheckLabel {
+    data class Person(val id: String) : CheckLabel
+    data object NotEnrolled : CheckLabel
+}
 
+/** The last check, with what's needed to label it for calibration. */
+data class LastCheck(
+    val result: FaceMatchResult,
+    val modelId: String?,
+    val bestFaceId: String?,
+    val score: Float,
+    val labelled: Boolean = false,
+) {
+    /** Only checks that produced a score (liveness passed, a comparison ran) can be labelled. */
+    val labellable: Boolean
+        get() = !labelled && bestFaceId != null && modelId != null &&
+            result.livenessPassed && (result.failure == null || result.failure == FaceFailure.AmbiguousMatch)
+}
+
+/** Plain harness state holder: runs FaceVerifier calls, model settings and calibration. */
+class HarnessController(
+    private val verifier: FaceVerifier,
+    private val settings: FaceModelSettings,
+    private val diagnostics: FaceDiagnostics,
+    private val calibration: CalibrationLog,
+) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /** Null until the first read from storage. */
     val faces: StateFlow<List<EnrolledFace>?> = verifier.enrolledFaces
         .stateIn(scope, SharingStarted.Eagerly, null)
 
+    val active: StateFlow<ActiveFaceModel?> = settings.active
+        .stateIn(scope, SharingStarted.Eagerly, null)
+
+    val stats: StateFlow<CalibrationStats> = combine(calibration.samples, settings.active) { samples, model ->
+        CalibrationStats.of(samples, model.model.id)
+    }.stateIn(scope, SharingStarted.Eagerly, CalibrationStats(emptyList(), emptyList()))
+
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
-    private val _lastResult = MutableStateFlow<FaceMatchResult?>(null)
-    val lastResult: StateFlow<FaceMatchResult?> = _lastResult.asStateFlow()
+    private val _lastCheck = MutableStateFlow<LastCheck?>(null)
+    val lastCheck: StateFlow<LastCheck?> = _lastCheck.asStateFlow()
 
     fun verify() {
         if (_busy.value) return
         _busy.value = true
         scope.launch {
             try {
-                _lastResult.value = verifier.verify()
+                val result = verifier.verify()
+                val info = diagnostics.info.value
+                _lastCheck.value = LastCheck(result, info.modelId, info.bestFaceId, info.lastScore ?: result.score)
             } finally {
                 _busy.value = false
             }
         }
     }
 
+    fun label(label: CheckLabel) {
+        val check = _lastCheck.value ?: return
+        val modelId = check.modelId ?: return
+        if (!check.labellable) return
+        val genuine = label is CheckLabel.Person && label.id == check.bestFaceId
+        _lastCheck.value = check.copy(labelled = true)
+        scope.launch { calibration.add(CalibrationSample(modelId, genuine, check.score)) }
+    }
+
+    fun selectModel(modelId: String) {
+        scope.launch {
+            settings.selectModel(modelId)
+            _lastCheck.value = null
+        }
+    }
+
+    fun setThreshold(threshold: Float?) {
+        val modelId = active.value?.model?.id ?: return
+        scope.launch { settings.setThreshold(modelId, threshold) }
+    }
+
+    fun clearCalibration() {
+        val modelId = active.value?.model?.id ?: return
+        scope.launch { calibration.clear(modelId) }
+    }
+
     fun delete(face: EnrolledFace) {
         scope.launch {
             verifier.deleteEnrollment(face.id)
-            if (_lastResult.value?.face?.id == face.id) _lastResult.value = null
+            if (_lastCheck.value?.result?.face?.id == face.id) _lastCheck.value = null
         }
     }
 }

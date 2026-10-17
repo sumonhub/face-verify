@@ -46,9 +46,24 @@ object FaceMatcher {
         return if (denom < 1e-10) 0f else (dot / denom).toFloat()
     }
 
-    /** Best similarity of [probe] against one person's templates, clamped to 0..1. */
+    /** Normalised mean of normalised embeddings: one stable vector for several frames. */
+    fun centroid(embeddings: List<FloatArray>): FloatArray {
+        require(embeddings.isNotEmpty()) { "No embeddings" }
+        val dim = embeddings.first().size
+        val sum = FloatArray(dim)
+        embeddings.forEach { e ->
+            val n = l2Normalize(e)
+            for (i in 0 until dim) sum[i] += n[i]
+        }
+        return l2Normalize(sum)
+    }
+
+    /**
+     * Similarity of [probe] to one person, clamped to 0..1: against the average of their templates,
+     * not the best single one, so one odd template can't let a stranger in.
+     */
     fun score(probe: FloatArray, templates: List<FloatArray>): Float =
-        (templates.maxOfOrNull { cosine(probe, it) } ?: 0f).coerceIn(0f, 1f)
+        if (templates.isEmpty()) 0f else cosine(probe, centroid(templates)).coerceIn(0f, 1f)
 
     /** 1:N identification: which of [people] (each a list of templates) the probe is, if any. */
     fun identify(probe: FloatArray, people: List<List<FloatArray>>, threshold: Float, margin: Float): Identification {

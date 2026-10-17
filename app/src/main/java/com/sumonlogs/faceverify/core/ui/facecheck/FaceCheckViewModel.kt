@@ -3,20 +3,22 @@ package com.sumonlogs.faceverify.core.ui.facecheck
 import com.sumonlogs.faceverify.core.api.FaceDiagnostics
 import com.sumonlogs.faceverify.core.api.FaceFailure
 import com.sumonlogs.faceverify.core.api.FaceMatchResult
+import com.sumonlogs.faceverify.core.api.FaceModelSettings
 import com.sumonlogs.faceverify.core.engine.FaceConfig
-import com.sumonlogs.faceverify.core.engine.FaceEmbedder
 import com.sumonlogs.faceverify.core.engine.FaceFrame
 import com.sumonlogs.faceverify.core.engine.FaceRecordStore
 import com.sumonlogs.faceverify.core.engine.LivenessChallenge
 import com.sumonlogs.faceverify.core.engine.QualityIssue
 import com.sumonlogs.faceverify.core.engine.VerificationSession
 import com.sumonlogs.faceverify.core.engine.VerifyStep
+import com.sumonlogs.faceverify.core.engine.android.FaceEmbedders
 import com.sumonlogs.faceverify.core.mvi.BaseViewModel
 import kotlinx.coroutines.delay
 
 class FaceCheckViewModel(
     private val store: FaceRecordStore,
-    private val embedder: FaceEmbedder,
+    private val settings: FaceModelSettings,
+    private val embedders: FaceEmbedders,
     private val config: FaceConfig,
     private val diagnostics: FaceDiagnostics,
 ) : BaseViewModel<FaceCheckIntent, FaceCheckState, FaceCheckEffect>(FaceCheckState()) {
@@ -42,7 +44,8 @@ class FaceCheckViewModel(
         if (started) return
         started = true
         launchSafely(onError = { finish(FaceMatchResult.failed(FaceFailure.EngineError), FacePrompt.Failed) }) {
-            val people = store.load()
+            val active = settings.current()
+            val people = store.load().filter { it.modelId == active.model.id }
             if (people.isEmpty()) {
                 finish(FaceMatchResult.failed(FaceFailure.NotEnrolled), null)
                 return@launchSafely
@@ -50,11 +53,12 @@ class FaceCheckViewModel(
             val challenge = LivenessChallenge.entries.random()
             diagnostics.update {
                 copy(
-                    threshold = config.matchThreshold, livenessChallenge = challenge.name, livenessPassed = null,
+                    modelId = active.model.id, threshold = active.threshold,
+                    livenessChallenge = challenge.name, livenessPassed = null, bestFaceId = null,
                     lastScore = null, runnerUpScore = null, lastMatched = null, lastFailure = null, embedMs = null,
                 )
             }
-            session = VerificationSession(config, challenge, people, embedder)
+            session = VerificationSession(config, active.threshold, challenge, people, embedders.forModel(active.model))
         }
     }
 
@@ -82,7 +86,7 @@ class FaceCheckViewModel(
                 )
             }
             is VerifyStep.Capture -> setState {
-                copy(step = 3, prompt = step.issue.toPrompt(FacePrompt.HoldStill), ringProgress = 0.85f)
+                copy(step = 3, prompt = step.issue.toPrompt(FacePrompt.HoldStill), ringProgress = 0.7f + 0.25f * step.progress)
             }
             is VerifyStep.Finished -> finish(step.result, step.result.toPrompt())
         }
@@ -126,6 +130,9 @@ class FaceCheckViewModel(
                 yaw = face?.yaw, pitch = face?.pitch, roll = face?.roll,
                 leftEyeOpen = face?.leftEyeOpen, rightEyeOpen = face?.rightEyeOpen,
                 runnerUpScore = session.identification?.runnerUpScore ?: runnerUpScore,
+                bestFaceId = session.bestFaceId ?: bestFaceId,
+                cropBrightness = session.lastCrop?.brightness ?: cropBrightness,
+                cropSharpness = session.lastCrop?.sharpness ?: cropSharpness,
                 detectMs = timings?.detectMs, embedMs = timings?.embedMs ?: embedMs, totalMs = timings?.totalMs,
                 qualityIssue = issue?.name,
             )
@@ -142,6 +149,10 @@ class FaceCheckViewModel(
         QualityIssue.TurnedAway -> FacePrompt.TurnedAway
         QualityIssue.Tilted -> FacePrompt.Tilted
         QualityIssue.EyesClosed -> FacePrompt.EyesClosed
+        QualityIssue.TooDark -> FacePrompt.TooDark
+        QualityIssue.TooBright -> FacePrompt.TooBright
+        QualityIssue.Blurry -> FacePrompt.Blurry
+        QualityIssue.FaceChanged -> fallback
     }
 
     private fun LivenessChallenge.toPrompt(): FacePrompt = when (this) {

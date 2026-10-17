@@ -5,6 +5,7 @@ import com.sumonlogs.faceverify.core.api.EnrolledFace
 import com.sumonlogs.faceverify.core.api.FaceDiagnostics
 import com.sumonlogs.faceverify.core.api.FaceFailure
 import com.sumonlogs.faceverify.core.api.FaceMatchResult
+import com.sumonlogs.faceverify.core.api.FaceModelSettings
 import com.sumonlogs.faceverify.core.api.FaceVerifier
 import com.sumonlogs.faceverify.core.engine.FaceRecordStore
 import kotlinx.coroutines.CancellationException
@@ -16,17 +17,19 @@ import kotlinx.coroutines.withContext
 
 class DefaultFaceVerifier(
     private val store: FaceRecordStore,
+    private val settings: FaceModelSettings,
     private val broker: FaceFlowBroker,
     private val activities: ActivityTracker,
     private val diagnostics: FaceDiagnostics,
 ) : FaceVerifier {
 
     override val enrolledFaces: Flow<List<EnrolledFace>> = store.records
-        .map { records -> records.map { EnrolledFace(it.id, it.name, it.enrolledAtMillis) } }
+        .map { records -> records.map { EnrolledFace(it.id, it.name, it.enrolledAtMillis, it.modelId) } }
         .catch { emit(emptyList()) }
 
     override suspend fun verify(): FaceMatchResult = try {
-        if (store.load().isEmpty()) {
+        val modelId = settings.current().model.id
+        if (store.load().none { it.modelId == modelId }) {
             FaceMatchResult.failed(FaceFailure.NotEnrolled).also { report(it) }
         } else {
             broker.run { launchFaceCheck() }

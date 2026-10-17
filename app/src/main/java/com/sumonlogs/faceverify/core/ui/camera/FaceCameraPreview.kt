@@ -20,7 +20,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sumonlogs.faceverify.core.engine.FaceConfig
-import com.sumonlogs.faceverify.core.engine.FaceEmbedder
 import com.sumonlogs.faceverify.core.engine.FaceFrame
 import com.sumonlogs.faceverify.core.engine.android.FaceCameraAnalyzer
 import com.sumonlogs.faceverify.core.engine.android.FaceCropper
@@ -39,7 +38,6 @@ fun FaceCameraPreview(
     modifier: Modifier = Modifier,
     detector: MlKitFaceDetector = koinInject(),
     cropper: FaceCropper = koinInject(),
-    embedder: FaceEmbedder = koinInject(),
     config: FaceConfig = koinInject(),
 ) {
     val context = LocalContext.current
@@ -69,7 +67,7 @@ fun FaceCameraPreview(
             .build()
         analysis.setAnalyzer(
             executor,
-            FaceCameraAnalyzer(detector, cropper, embedder, config, { currentOnFrame(it) }, { currentOnError(it) }),
+            FaceCameraAnalyzer(detector, cropper, config, { currentOnFrame(it) }, { currentOnError(it) }),
         )
         var provider: ProcessCameraProvider? = null
         var disposed = false

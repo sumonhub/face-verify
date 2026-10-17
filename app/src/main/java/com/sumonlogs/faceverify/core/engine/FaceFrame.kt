@@ -16,9 +16,12 @@ data class FaceObservation(
     val roll: Float,
     val leftEyeOpen: Float?,
     val rightEyeOpen: Float?,
-    /** The person's own left / right eye (so [leftEye] appears on the image's right). */
+    /** Landmarks use the person's own left / right (so [leftEye] appears on the image's right). */
     val leftEye: Point?,
     val rightEye: Point?,
+    val noseBase: Point? = null,
+    val mouthLeft: Point? = null,
+    val mouthRight: Point? = null,
     val trackingId: Int?,
 ) {
     val width: Float get() = right - left

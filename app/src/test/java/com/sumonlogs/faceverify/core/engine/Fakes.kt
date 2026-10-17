@@ -2,6 +2,7 @@ package com.sumonlogs.faceverify.core.engine
 
 const val FRAME_W = 480
 const val FRAME_H = 640
+const val FAKE_CROP = 12
 
 fun face(
     yaw: Float = 0f,
@@ -20,21 +21,37 @@ fun face(
     trackingId = trackingId,
 )
 
+/**
+ * A crop with real texture (so it passes the brightness and sharpness checks). The person is encoded
+ * in the alpha byte, which CropQuality ignores: tag 0 is "Alex", any other tag is somebody else.
+ */
+fun fakeCrop(tag: Int, gray: Int = 130, contrast: Int = 40): IntArray = IntArray(FAKE_CROP * FAKE_CROP) { i ->
+    val v = if ((i / FAKE_CROP + i % FAKE_CROP) % 2 == 0) gray + contrast else gray - contrast
+    (tag shl 24) or (v shl 16) or (v shl 8) or v
+}
+
 class FakeFrame(
     override val timestampMs: Long,
     override val faces: List<FaceObservation>,
     private val pixelTag: Int = 0,
+    private val gray: Int = 130,
+    private val contrast: Int = 40,
 ) : FaceFrame {
     override val width = FRAME_W
     override val height = FRAME_H
     override val detectMs = 5L
-    override fun alignedFace(face: FaceObservation): IntArray = IntArray(4) { pixelTag }
+    override fun alignedFace(face: FaceObservation): IntArray = fakeCrop(pixelTag, gray, contrast)
     override fun selfieJpeg(): ByteArray = byteArrayOf(1, 2, 3)
 }
 
-/** Embeds by pixel tag: tag 0 is "the enrolled person", any other tag is somebody else. */
 class FakeEmbedder : FaceEmbedder {
-    override val inputSize = 2
-    override fun embed(argb: IntArray): FloatArray =
-        if (argb.first() == 0) floatArrayOf(1f, 0f, 0f) else floatArrayOf(0f, 1f, 0f)
+    override val model = FaceModels.SFace
+    override val inputSize = FAKE_CROP
+    var calls = 0
+        private set
+
+    override fun embed(faces: List<IntArray>): List<FloatArray> {
+        calls++
+        return faces.map { if (it.first() ushr 24 == 0) floatArrayOf(1f, 0f, 0f) else floatArrayOf(0f, 1f, 0f) }
+    }
 }

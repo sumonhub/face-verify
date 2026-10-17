@@ -2,12 +2,9 @@ package com.sumonlogs.faceverify.core.engine
 
 /**
  * Every tunable of the face engine in one place. Angles are degrees, ratios are fractions of the
- * upright analysis frame. [matchThreshold] is the single value that decides a match.
+ * upright analysis frame. The match threshold belongs to the model: see [FaceModelSpec.defaultThreshold].
  */
 data class FaceConfig(
-    /** Cosine similarity (clamped to 0..1) at or above which a probe matches the enrolled face. */
-    val matchThreshold: Float = 0.60f,
-
     /** The best person must beat the runner-up by at least this much, or the result is ambiguous. */
     val identifyMargin: Float = 0.05f,
 
@@ -26,6 +23,13 @@ data class FaceConfig(
     /** Consecutive good frames needed before a step counts as done. */
     val stableFrames: Int = 4,
 
+    // Face crop quality (see CropQuality)
+    val minBrightness: Float = 50f,
+    val maxBrightness: Float = 215f,
+    val minSharpness: Float = 15f,
+    /** Minimum time between two frames used for embeddings, so they aren't near-duplicates. */
+    val captureSpacingMs: Long = 120L,
+
     // Liveness
     val turnYawDeg: Float = 20f,
     val livenessTimeoutMs: Long = 8_000L,
@@ -33,11 +37,15 @@ data class FaceConfig(
     // Enrollment
     val enrollTurnYawDeg: Float = 18f,
     val enrollUpPitchDeg: Float = 12f,
-    /** Every pose embedding must be at least this similar to the front one, or enrollment restarts. */
-    val enrollConsistencyMin: Float = 0.45f,
+    /** Front-facing frames embedded and averaged into a person's template. */
+    val enrollFrontFrames: Int = 5,
+    /** Every enrollment frame must be at least this similar to their average, or enrollment fails. */
+    val enrollConsistencyMin: Float = 0.5f,
 
     // Session
     val verifyTimeoutMs: Long = 25_000L,
+    /** Front-facing frames embedded and averaged for each face check. */
+    val verifyFrames: Int = 3,
     val selfieMaxSide: Int = 640,
     val selfieJpegQuality: Int = 80,
 )

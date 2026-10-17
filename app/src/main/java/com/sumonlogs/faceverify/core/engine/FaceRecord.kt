@@ -7,11 +7,12 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
 
-/** One enrolled person: a display name and one embedding per enrollment pose. */
+/** One enrolled person: a display name and the front-facing embeddings made by [modelId]. */
 class FaceRecord(
     val id: String,
     val name: String,
     val enrolledAtMillis: Long,
+    val modelId: String,
     val templates: List<FloatArray>,
 )
 
@@ -29,10 +30,11 @@ interface FaceRecordStore {
 
 /**
  * Binary layout of the enrolled people before encryption (big-endian):
- * version · count · per record: id (UTF) · name (UTF) · enrolledAt (long) · templates · dimension · floats.
+ * version · count · per record: id · name · enrolledAt (long) · modelId · templates · dimension · floats.
+ * Strings are modified UTF-8. Older versions are not read: their embeddings came from the old pipeline.
  */
 object FaceRecordCodec {
-    private const val VERSION = 2
+    private const val VERSION = 3
     private const val MAX_RECORDS = 10_000
     private const val MAX_TEMPLATES = 16
     private const val MAX_DIMENSION = 4096
@@ -49,6 +51,7 @@ object FaceRecordCodec {
                 out.writeUTF(record.id)
                 out.writeUTF(record.name)
                 out.writeLong(record.enrolledAtMillis)
+                out.writeUTF(record.modelId)
                 out.writeInt(record.templates.size)
                 out.writeInt(dim)
                 record.templates.forEach { t -> t.forEach(out::writeFloat) }
@@ -67,10 +70,11 @@ object FaceRecordCodec {
                 val id = input.readUTF()
                 val name = input.readUTF()
                 val at = input.readLong()
+                val modelId = input.readUTF()
                 val templateCount = input.readInt()
                 val dim = input.readInt()
                 if (templateCount !in 1..MAX_TEMPLATES || dim !in 1..MAX_DIMENSION) return null
-                FaceRecord(id, name, at, List(templateCount) { FloatArray(dim) { input.readFloat() } })
+                FaceRecord(id, name, at, modelId, List(templateCount) { FloatArray(dim) { input.readFloat() } })
             }
             if (input.available() != 0) return null
             records

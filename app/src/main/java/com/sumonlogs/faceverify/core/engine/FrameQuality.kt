@@ -2,7 +2,15 @@ package com.sumonlogs.faceverify.core.engine
 
 import kotlin.math.abs
 
-enum class QualityIssue { NoFace, MultipleFaces, TooFar, TooClose, NotCentred, TurnedAway, Tilted, EyesClosed }
+enum class QualityIssue {
+    NoFace, MultipleFaces, TooFar, TooClose, NotCentred, TurnedAway, Tilted, EyesClosed,
+
+    // Face crop (CropQuality)
+    TooDark, TooBright, Blurry,
+
+    /** A different person appeared mid-enrollment; it starts over. */
+    FaceChanged,
+}
 
 sealed interface QualityCheck {
     data class Good(val face: FaceObservation) : QualityCheck

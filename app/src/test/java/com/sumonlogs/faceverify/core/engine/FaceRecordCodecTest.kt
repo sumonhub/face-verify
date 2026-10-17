@@ -11,8 +11,8 @@ class FaceRecordCodecTest {
     @Test
     fun `round trip keeps every person and value`() {
         val records = listOf(
-            FaceRecord("id-1", "Alex", 1_000L, listOf(floatArrayOf(0.1f, -0.5f, 2f), floatArrayOf(1f, 2f, 3f))),
-            FaceRecord("id-2", "সাম", 2_000L, listOf(floatArrayOf(4f, 5f, 6f))),
+            FaceRecord("id-1", "Alex", 1_000L, "sface-2021dec", listOf(floatArrayOf(0.1f, -0.5f, 2f), floatArrayOf(1f, 2f, 3f))),
+            FaceRecord("id-2", "সাম", 2_000L, "mobilefacenet", listOf(floatArrayOf(4f, 5f, 6f))),
         )
         val decoded = FaceRecordCodec.decode(FaceRecordCodec.encode(records))
         requireNotNull(decoded)
@@ -20,6 +20,7 @@ class FaceRecordCodecTest {
         assertEquals("Alex", decoded[0].name)
         assertEquals("সাম", decoded[1].name)
         assertEquals(2_000L, decoded[1].enrolledAtMillis)
+        assertEquals("mobilefacenet", decoded[1].modelId)
         assertArrayEquals(records[0].templates[1], decoded[0].templates[1], 0f)
         assertArrayEquals(records[1].templates[0], decoded[1].templates[0], 0f)
     }
@@ -31,7 +32,7 @@ class FaceRecordCodecTest {
 
     @Test
     fun `truncated, padded or foreign bytes decode to null`() {
-        val bytes = FaceRecordCodec.encode(listOf(FaceRecord("a", "b", 0L, listOf(floatArrayOf(1f, 2f)))))
+        val bytes = FaceRecordCodec.encode(listOf(FaceRecord("a", "b", 0L, "m", listOf(floatArrayOf(1f, 2f)))))
         assertNull(FaceRecordCodec.decode(bytes.copyOf(bytes.size - 1)))
         assertNull(FaceRecordCodec.decode(bytes + 0))
         assertNull(FaceRecordCodec.decode(byteArrayOf(1, 0, 0, 0, 1)))
