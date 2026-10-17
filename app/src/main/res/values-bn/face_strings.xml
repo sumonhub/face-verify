@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Shared -->
-    <string name="face_ai_logo">ওয়ার্কোপলো এআই</string>
     <string name="face_cd_close">বন্ধ করুন</string>
-    <string name="face_cd_back">পেছনে</string>
     <string name="face_cd_cancel_check">ফেস চেক বাতিল করুন</string>
     <string name="face_cd_cancel_enrollment">এনরোলমেন্ট বাতিল করুন</string>
     <string name="face_step_of">ধাপ %1$d / %2$d</string>
     <string name="face_try_again">আবার চেষ্টা করুন</string>
     <string name="face_ok">ঠিক আছে</string>
+    <string name="face_done">সম্পন্ন</string>
 
     <!-- Face check -->
     <string name="face_check_title">ফেস চেক</string>
-    <string name="face_privacy_evidence">আপনার ছবি আপনার প্রতিষ্ঠানের জন্য হাজিরার প্রমাণ হিসেবে রাখা হয়। এটি আপনাকে শনাক্ত করতে ব্যবহার করা হয় না।</string>
+    <string name="face_privacy_note">আপনার মুখ এই ফোনেই, এখানে এনরোল করা মুখগুলোর সাথে মেলানো হয়। কোথাও কিছু পাঠানো হয় না।</string>
     <string name="face_hint_look">ক্যামেরার দিকে তাকান</string>
     <string name="face_hint_no_face">আপনার মুখ দেখা যাচ্ছে না</string>
     <string name="face_hint_multiple">শুধু একজন থাকুন</string>
@@ -30,17 +29,20 @@
     <string name="face_capture_title">সোজা ক্যামেরার দিকে তাকান</string>
     <string name="face_capture_sub">স্থির থাকুন…</string>
     <string name="face_result_matched">মুখ মিলেছে</string>
-    <string name="face_result_matched_sub">সব ঠিক আছে।</string>
-    <string name="face_result_mismatch">মুখ মেলেনি</string>
+    <string name="face_result_matched_named">মিলেছে: %1$s</string>
+    <string name="face_result_matched_sub">মুখ চেনা গেছে।</string>
+    <string name="face_result_mismatch">কারও সাথে মেলেনি</string>
+    <string name="face_result_mismatch_sub">এই মুখ এনরোল করা কারও সাথে মেলেনি।</string>
+    <string name="face_result_ambiguous">কে তা নিশ্চিত হওয়া যায়নি</string>
     <string name="face_result_liveness">আপনি উপস্থিত কি না নিশ্চিত করা যায়নি</string>
     <string name="face_result_no_face">আপনার মুখ দেখা যায়নি</string>
     <string name="face_result_failed">ফেস চেক শেষ হয়নি</string>
-    <string name="face_result_approval_sub">আপনি তবুও এগোতে পারবেন। এটি অনুমোদনের জন্য পাঠানো হবে।</string>
+    <string name="face_result_retry_sub">আবার চেষ্টা করুন।</string>
     <string name="face_camera_unavailable">ক্যামেরা পাওয়া যাচ্ছে না</string>
 
     <!-- Camera permission -->
     <string name="face_perm_headline">ফেস চেকের জন্য ক্যামেরা দরকার</string>
-    <string name="face_perm_body">শুধু ফেস চেকের সময় সামনের ক্যামেরা ব্যবহার করা হয়, এটা সত্যিই আপনি কি না নিশ্চিত করতে। চেকটি এই ফোনেই হয়।</string>
+    <string name="face_perm_body">শুধু ফেস চেক ও এনরোলমেন্টের সময় সামনের ক্যামেরা ব্যবহার হয়। সবকিছু এই ফোনেই হয়।</string>
     <string name="face_perm_allow">ক্যামেরার অনুমতি দিন</string>
     <string name="face_perm_not_now">এখন না</string>
     <string name="face_perm_denied_headline">ক্যামেরার অনুমতি বন্ধ আছে</string>
@@ -49,10 +51,10 @@
 
     <!-- Enrollment -->
     <string name="face_enroll_title">ফেস এনরোলমেন্ট</string>
-    <string name="face_enroll_approved">আপনার অ্যাডমিন অনুমোদন দিয়েছেন</string>
-    <string name="face_enroll_intro_headline">চলুন আপনার মুখ সেট আপ করি</string>
-    <string name="face_enroll_intro_body">প্রায় ২০ সেকেন্ড লাগবে।</string>
-    <string name="face_enroll_intro_body_reenroll">প্রায় ২০ সেকেন্ড লাগবে। ফেস চেকে আপনার পুরোনো ছবির জায়গায় নতুন ছবিটি ব্যবহার হবে।</string>
+    <string name="face_enroll_intro_headline">একটি মুখ এনরোল করুন</string>
+    <string name="face_enroll_intro_body">প্রায় ২০ সেকেন্ড লাগবে। একটি নাম লিখুন, তারপর নির্দেশনা অনুসরণ করুন।</string>
+    <string name="face_enroll_name_label">নাম</string>
+    <string name="face_enroll_name_hint">নাম লিখুন</string>
     <string name="face_tip_light_title">ভালো আলো খুঁজুন</string>
     <string name="face_tip_light_body">জানালা বা উজ্জ্বল আলোর দিকে মুখ করুন</string>
     <string name="face_tip_face_title">পুরো মুখ দেখান</string>
@@ -60,7 +62,7 @@
     <string name="face_tip_phone_title">ফোন চোখের সমান উচ্চতায় ধরুন</string>
     <string name="face_tip_phone_body">মুখ ডিম্বাকৃতির ভেতরে রাখুন</string>
     <string name="face_enroll_start">শুরু করুন</string>
-    <string name="face_enroll_privacy">আপনার ছবি শুধু হাজিরা যাচাইয়ের জন্য ব্যবহার করা হয়।</string>
+    <string name="face_enroll_privacy">মুখের তথ্য এনক্রিপ্ট করে শুধু এই ফোনে রাখা হয়।</string>
     <string name="face_pose_front">সামনে</string>
     <string name="face_pose_left">বাঁয়ে</string>
     <string name="face_pose_right">ডানে</string>
@@ -74,49 +76,10 @@
     <string name="face_enroll_help_body">ভালো আলোতে থাকুন এবং সানগ্লাস, মাস্ক বা টুপি খুলে ফেলুন। ফোন চোখের সমান উচ্চতায় ধরুন, ধীরে মাথা ঘোরান এবং প্রতিটি অবস্থানে এক মুহূর্ত স্থির থাকুন।</string>
     <string name="face_enroll_saving">সেভ হচ্ছে…</string>
     <string name="face_enroll_failed">কাজ হয়নি</string>
-    <string name="face_enroll_failed_inconsistent">ক্যামেরার সামনে শুধু আপনি আছেন কি না দেখে আবার চেষ্টা করুন।</string>
+    <string name="face_enroll_failed_inconsistent">ক্যামেরার সামনে শুধু একজন আছেন কি না দেখে আবার চেষ্টা করুন।</string>
     <string name="face_enroll_failed_error">কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।</string>
-    <string name="face_enroll_done_named">সব ঠিক হয়ে গেছে, %1$s!</string>
-    <string name="face_enroll_done">সব ঠিক হয়ে গেছে!</string>
-    <string name="face_enroll_done_body">আপনার নতুন ছবি সেভ হয়েছে। পরের অফিস ইন থেকে ফেস চেকে এটি ব্যবহার হবে।</string>
-    <string name="face_continue_attendance">হাজিরায় ফিরে যান</string>
-
-    <!-- Repeated mismatch -->
-    <string name="face_mismatch_pill">মুখ মেলেনি</string>
-    <string name="face_mismatch_named">বারবার এমন হচ্ছে, %1$s</string>
-    <string name="face_mismatch">বারবার এমন হচ্ছে</string>
-    <string name="face_mismatch_body">%1$s আপনার মুখ মেলেনি। আপনার সেভ করা ছবিটি হয়তো পুরোনো হয়ে গেছে। আবার সেট আপ করার অনুমতি চেয়ে অ্যাডমিনকে বলুন।</string>
-    <string name="face_request_reenroll">ফেস রি-এনরোলমেন্টের অনুরোধ করুন</string>
-    <string name="face_mismatch_note">আজও অফিস ইন করতে পারবেন। এটি অনুমোদনের জন্য পাঠানো হবে।</string>
-
-    <!-- Re-enrollment request -->
-    <string name="face_reenroll_title">ফেস রি-এনরোলমেন্ট</string>
-    <string name="face_reenroll_ai">%1$s আপনার মুখ মেলেনি। ফেস চেক আবার সেট আপ করার অনুমতি চেয়ে অ্যাডমিনকে বলুন।</string>
-    <string name="face_reenroll_row">মুখ মেলেনি</string>
-    <string name="face_reenroll_what_changed">কী বদলেছে?</string>
-    <string name="face_reason_look">আমার চেহারা বদলেছে (দাড়ি, চশমা, চুল)</string>
-    <string name="face_reason_photo">আমার সেভ করা ছবি পুরোনো বা অস্পষ্ট</string>
-    <string name="face_reason_other">অন্য কিছু</string>
-    <string name="face_reenroll_note_label">অ্যাডমিনের জন্য নোট (ঐচ্ছিক)</string>
-    <string name="face_reenroll_send">অ্যাডমিনকে অনুরোধ পাঠান</string>
-    <string name="face_reenroll_send_failed">অনুরোধ পাঠানো যায়নি। আবার চেষ্টা করুন।</string>
-
-    <!-- Re-enrollment requested -->
-    <string name="face_reenroll_request_id">অনুরোধ #%1$s</string>
-    <string name="face_reenroll_sent_bold">অনুরোধ আপনার অ্যাডমিনের কাছে পাঠানো হয়েছে।</string>
-    <string name="face_reenroll_sent_rest">অনুমোদন দিলেই আমরা আপনাকে জানাব।</string>
-    <string name="face_timeline_sent">অনুরোধ পাঠানো হয়েছে</string>
-    <string name="face_timeline_sent_at">%1$s, %2$s</string>
-    <string name="face_timeline_waiting">অ্যাডমিনের অনুমোদনের অপেক্ষায়</string>
-    <string name="face_timeline_waiting_sub">সাধারণত ১ কর্মদিবসের মধ্যে</string>
-    <string name="face_timeline_setup">আবার মুখ সেট আপ করুন</string>
-    <string name="face_timeline_setup_sub">শুরু করার জন্য নোটিফিকেশন পাবেন</string>
-    <string name="face_until_then">ততক্ষণ</string>
-    <string name="face_until_then_attendance">আগের মতোই অফিস ইন ও অফিস আউট করতে পারবেন।</string>
-    <string name="face_until_then_approval">যেদিন মুখ মিলবে না, সেদিনের জন্য অনুমোদন লাগবে।</string>
-    <string name="face_back_to_attendance">হাজিরায় ফিরে যান</string>
-    <plurals name="face_mismatch_count">
-        <item quantity="one">গত %2$d দিনের %1$d দিন</item>
-        <item quantity="other">গত %2$d দিনের %1$d দিন</item>
-    </plurals>
+    <string name="face_enroll_duplicate_title">আগেই এনরোল করা আছে</string>
+    <string name="face_enroll_duplicate">এই মুখটি %1$s নামে আগেই এনরোল করা আছে।</string>
+    <string name="face_enroll_done_named">%1$s এনরোল হয়েছে</string>
+    <string name="face_enroll_done_body">ফেস চেক এখন এই ব্যক্তিকে চিনতে পারবে।</string>
 </resources>

@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = 'com.banglatrac.workopolo.face'
+    namespace = 'com.sumonlogs.faceverify'
     compileSdk = 37
 
     defaultConfig {
-        applicationId = 'com.banglatrac.workopolo.face'
+        applicationId = 'com.sumonlogs.faceverify'
         minSdk = 27
         targetSdk = 37
         versionCode = 1

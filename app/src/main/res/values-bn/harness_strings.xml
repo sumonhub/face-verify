@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="harness_demo_user">মাজবা</string>
-    <string name="harness_enrolled_yes">মুখ এনরোল করা আছে</string>
-    <string name="harness_enrolled_no">এখনও মুখ এনরোল করা হয়নি</string>
-    <string name="harness_enrolled_unknown">এনরোলমেন্ট দেখা হচ্ছে…</string>
-    <string name="harness_enroll">এনরোল</string>
+    <string name="harness_enroll">মুখ এনরোল করুন</string>
     <string name="harness_verify">যাচাই</string>
     <string name="harness_verifying">যাচাই হচ্ছে…</string>
-    <string name="harness_reset">এনরোলমেন্ট মুছুন</string>
-    <string name="harness_add_past_mismatch">আগের একটি দিনে না মেলা যোগ করুন</string>
+    <string name="harness_loading">লোড হচ্ছে…</string>
+    <string name="harness_last_result">শেষ চেক</string>
+    <string name="harness_result_matched">মিলেছে: %1$s</string>
+    <string name="harness_result_no_match">মেলেনি</string>
+    <string name="harness_result_failed">ব্যর্থ: %1$s</string>
+    <string name="harness_enrolled_title">এনরোল করা মুখ</string>
+    <string name="harness_enrolled_empty">এখনও কেউ এনরোল করা নেই।</string>
+    <string name="harness_enrolled_at">এনরোল: %1$s</string>
+    <string name="harness_delete">মুছুন</string>
+    <string name="harness_delete_title">%1$s-কে মুছবেন?</string>
+    <string name="harness_delete_body">এই ফোন থেকে তার মুখের তথ্য মুছে যাবে।</string>
+    <string name="harness_cancel">বাতিল</string>
     <string name="harness_debug_title">ডিবাগ</string>
     <string name="harness_debug_threshold">থ্রেশহোল্ড</string>
-    <string name="harness_debug_score">মিলের স্কোর</string>
+    <string name="harness_debug_score">সেরা স্কোর</string>
+    <string name="harness_debug_runner_up">দ্বিতীয় সেরা স্কোর</string>
     <string name="harness_debug_matched">মিলেছে</string>
     <string name="harness_debug_challenge">লাইভনেস চ্যালেঞ্জ</string>
     <string name="harness_debug_liveness">লাইভনেস পাস</string>
@@ -23,8 +30,4 @@
     <string name="harness_debug_embed">এমবেডিং</string>
     <string name="harness_debug_total">চেকের সময়</string>
     <string name="harness_debug_selfie">সেলফি</string>
-    <plurals name="harness_show_mismatch">
-        <item quantity="one">বারবার না মেলার স্ক্রিন (%2$d দিনের %1$d দিন)</item>
-        <item quantity="other">বারবার না মেলার স্ক্রিন (%2$d দিনের %1$d দিন)</item>
-    </plurals>
 </resources>
