@@ -14,6 +14,7 @@ import com.banglatrac.workopolo.face.core.engine.android.KeystoreCipher
 import com.banglatrac.workopolo.face.core.engine.android.LiteRtFaceEmbedder
 import com.banglatrac.workopolo.face.core.engine.android.MlKitFaceDetector
 import com.banglatrac.workopolo.face.core.engine.android.faceTemplateDataStore
+import com.banglatrac.workopolo.face.core.ui.enrollment.EnrollmentCaptureViewModel
 import com.banglatrac.workopolo.face.core.ui.facecheck.FaceCheckViewModel
 import org.koin.android.ext.koin.androidApplication
 import org.koin.android.ext.koin.androidContext
@@ -38,4 +39,5 @@ val faceModule = module {
 
     // Screens
     viewModel { FaceCheckViewModel(get(), get(), get(), get()) }
+    viewModel { EnrollmentCaptureViewModel(get(), get(), get(), get()) }
 }
