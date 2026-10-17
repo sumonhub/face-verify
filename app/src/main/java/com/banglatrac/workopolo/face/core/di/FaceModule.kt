@@ -16,6 +16,7 @@ import com.banglatrac.workopolo.face.core.engine.android.MlKitFaceDetector
 import com.banglatrac.workopolo.face.core.engine.android.faceTemplateDataStore
 import com.banglatrac.workopolo.face.core.ui.enrollment.EnrollmentCaptureViewModel
 import com.banglatrac.workopolo.face.core.ui.facecheck.FaceCheckViewModel
+import com.banglatrac.workopolo.face.core.ui.reenroll.ReenrollRequestViewModel
 import org.koin.android.ext.koin.androidApplication
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -40,4 +41,6 @@ val faceModule = module {
     // Screens
     viewModel { FaceCheckViewModel(get(), get(), get(), get()) }
     viewModel { EnrollmentCaptureViewModel(get(), get(), get(), get()) }
+    // Needs a FaceReenrollmentGateway from the host app.
+    viewModel { ReenrollRequestViewModel(get()) }
 }
