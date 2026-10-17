@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import androidx.camera.core.ImageProxy
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import com.banglatrac.workopolo.face.core.engine.FaceObservation
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
@@ -46,7 +48,7 @@ class FaceCropper {
             matrix.setScale(s, s)
             matrix.preTranslate(-(face.centerX - side / 2f), -(face.centerY - side / 2f))
         }
-        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val out = createBitmap(size, size)
         Canvas(out).drawBitmap(upright, matrix, paint)
         val pixels = IntArray(size * size)
         out.getPixels(pixels, 0, size, 0, 0, size, size)
@@ -58,7 +60,7 @@ class FaceCropper {
         val longest = max(upright.width, upright.height)
         val scaled = if (longest > maxSide) {
             val f = maxSide.toFloat() / longest
-            Bitmap.createScaledBitmap(upright, (upright.width * f).roundToInt(), (upright.height * f).roundToInt(), true)
+            upright.scale((upright.width * f).roundToInt(), (upright.height * f).roundToInt())
         } else {
             upright
         }

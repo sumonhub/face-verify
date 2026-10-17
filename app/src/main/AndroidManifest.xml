@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
         android:name="android.hardware.camera.front"
         android:required="false" />
 
@@ -37,7 +40,6 @@
         <activity
             android:name=".core.FaceCheckActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.WorkopoloFace.FaceCheck" />
     </application>
 

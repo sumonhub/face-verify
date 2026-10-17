@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -117,7 +118,7 @@ fun FaceMismatchScreen(
             Text(
                 text = highlighted(
                     stringResource(R.string.face_mismatch_body),
-                    stringResource(R.string.face_mismatch_count, summary.mismatchDays, summary.windowDays),
+                    pluralStringResource(R.plurals.face_mismatch_count, summary.windowDays, summary.mismatchDays, summary.windowDays),
                     FaceColors.White,
                 ),
                 style = FaceTypography.BodyRelaxed,
@@ -184,7 +185,7 @@ fun ReenrollRequestScreen(
             AiText(
                 text = highlighted(
                     stringResource(R.string.face_reenroll_ai),
-                    stringResource(R.string.face_mismatch_count, summary.mismatchDays, summary.windowDays),
+                    pluralStringResource(R.plurals.face_mismatch_count, summary.windowDays, summary.mismatchDays, summary.windowDays),
                     FaceColors.White,
                 ),
                 style = FaceTypography.AiMessageCompact,

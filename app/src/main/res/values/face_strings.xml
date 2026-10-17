@@ -85,7 +85,6 @@
     <string name="face_mismatch_pill">Face didn\'t match</string>
     <string name="face_mismatch_named">This keeps happening, %1$s</string>
     <string name="face_mismatch">This keeps happening</string>
-    <string name="face_mismatch_count">%1$d of the last %2$d days</string>
     <string name="face_mismatch_body">Your face didn\'t match on %1$s. Your saved face photo may be out of date. Ask your admin to let you set it up again.</string>
     <string name="face_request_reenroll">Request face re-enrollment</string>
     <string name="face_mismatch_note">You can still Office In today. It will be sent for approval.</string>
@@ -116,4 +115,8 @@
     <string name="face_until_then_attendance">You can keep doing Office In and Office Out as usual.</string>
     <string name="face_until_then_approval">Days where your face doesn\'t match will need approval.</string>
     <string name="face_back_to_attendance">Back to Attendance</string>
+    <plurals name="face_mismatch_count">
+        <item quantity="one">%1$d of the last %2$d day</item>
+        <item quantity="other">%1$d of the last %2$d days</item>
+    </plurals>
 </resources>

@@ -85,7 +85,6 @@
     <string name="face_mismatch_pill">মুখ মেলেনি</string>
     <string name="face_mismatch_named">বারবার এমন হচ্ছে, %1$s</string>
     <string name="face_mismatch">বারবার এমন হচ্ছে</string>
-    <string name="face_mismatch_count">গত %2$d দিনের %1$d দিন</string>
     <string name="face_mismatch_body">%1$s আপনার মুখ মেলেনি। আপনার সেভ করা ছবিটি হয়তো পুরোনো হয়ে গেছে। আবার সেট আপ করার অনুমতি চেয়ে অ্যাডমিনকে বলুন।</string>
     <string name="face_request_reenroll">ফেস রি-এনরোলমেন্টের অনুরোধ করুন</string>
     <string name="face_mismatch_note">আজও অফিস ইন করতে পারবেন। এটি অনুমোদনের জন্য পাঠানো হবে।</string>
@@ -116,4 +115,8 @@
     <string name="face_until_then_attendance">আগের মতোই অফিস ইন ও অফিস আউট করতে পারবেন।</string>
     <string name="face_until_then_approval">যেদিন মুখ মিলবে না, সেদিনের জন্য অনুমোদন লাগবে।</string>
     <string name="face_back_to_attendance">হাজিরায় ফিরে যান</string>
+    <plurals name="face_mismatch_count">
+        <item quantity="one">গত %2$d দিনের %1$d দিন</item>
+        <item quantity="other">গত %2$d দিনের %1$d দিন</item>
+    </plurals>
 </resources>

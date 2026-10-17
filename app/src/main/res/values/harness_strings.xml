@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sample name from the design boards; the main app passes the real one. -->
+    <string name="harness_demo_user">Mazba</string>
+    <string name="harness_enrolled_yes">Face enrolled</string>
+    <string name="harness_enrolled_no">No face enrolled yet</string>
+    <string name="harness_enrolled_unknown">Checking enrollment…</string>
+    <string name="harness_enroll">Enroll</string>
+    <string name="harness_verify">Verify</string>
+    <string name="harness_verifying">Verifying…</string>
+    <string name="harness_reset">Reset enrollment</string>
+    <string name="harness_add_past_mismatch">Add a mismatch on an earlier day</string>
+    <string name="harness_debug_title">Debug</string>
+    <string name="harness_debug_threshold">Threshold</string>
+    <string name="harness_debug_score">Match score</string>
+    <string name="harness_debug_matched">Matched</string>
+    <string name="harness_debug_challenge">Liveness challenge</string>
+    <string name="harness_debug_liveness">Liveness passed</string>
+    <string name="harness_debug_failure">Failure</string>
+    <string name="harness_debug_quality">Frame issue</string>
+    <string name="harness_debug_angles">Yaw / pitch / roll</string>
+    <string name="harness_debug_eyes">Eyes open (L / R)</string>
+    <string name="harness_debug_detect">Detection</string>
+    <string name="harness_debug_embed">Embedding</string>
+    <string name="harness_debug_total">Check duration</string>
+    <string name="harness_debug_selfie">Selfie</string>
+    <plurals name="harness_show_mismatch">
+        <item quantity="one">Repeated mismatch screen (%1$d of %2$d day)</item>
+        <item quantity="other">Repeated mismatch screen (%1$d of %2$d days)</item>
+    </plurals>
+</resources>
