@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared -->
+    <string name="face_ai_logo">Workopolo AI</string>
+    <string name="face_cd_close">Close</string>
+    <string name="face_cd_back">Back</string>
+    <string name="face_cd_cancel_check">Cancel face check</string>
+    <string name="face_cd_cancel_enrollment">Cancel enrollment</string>
+    <string name="face_step_of">Step %1$d of %2$d</string>
+    <string name="face_try_again">Try again</string>
+    <string name="face_ok">OK</string>
+
+    <!-- Face check -->
+    <string name="face_check_title">Face check</string>
+    <string name="face_privacy_evidence">Your photo is kept as attendance evidence for your organisation. It isn\'t used to identify you.</string>
+    <string name="face_hint_look">Look at the camera</string>
+    <string name="face_hint_no_face">We can\'t see your face</string>
+    <string name="face_hint_multiple">Only one person, please</string>
+    <string name="face_hint_too_far">Move a little closer</string>
+    <string name="face_hint_too_close">Move back a little</string>
+    <string name="face_hint_not_centred">Centre your face in the oval</string>
+    <string name="face_hint_turned">Face the camera</string>
+    <string name="face_hint_tilted">Keep your head straight</string>
+    <string name="face_hint_eyes">Open your eyes</string>
+    <string name="face_sub_keep_in_oval">Keep your face inside the oval</string>
+    <string name="face_challenge_blink">Blink slowly</string>
+    <string name="face_challenge_left">Turn your head slowly left</string>
+    <string name="face_challenge_right">Turn your head slowly right</string>
+    <string name="face_sub_checking_live">Checking that you\'re live…</string>
+    <string name="face_capture_title">Look straight at the camera</string>
+    <string name="face_capture_sub">Hold still…</string>
+    <string name="face_result_matched">Face matched</string>
+    <string name="face_result_matched_sub">You\'re good to go.</string>
+    <string name="face_result_mismatch">Face didn\'t match</string>
+    <string name="face_result_liveness">We couldn\'t confirm you\'re live</string>
+    <string name="face_result_no_face">We couldn\'t see your face</string>
+    <string name="face_result_failed">Face check didn\'t finish</string>
+    <string name="face_result_approval_sub">You can still continue. It will be sent for approval.</string>
+    <string name="face_camera_unavailable">Camera isn\'t available</string>
+
+    <!-- Camera permission -->
+    <string name="face_perm_headline">Face check needs your camera</string>
+    <string name="face_perm_body">We use the front camera only during face check, to confirm it\'s really you. The check runs on this phone.</string>
+    <string name="face_perm_allow">Allow camera</string>
+    <string name="face_perm_not_now">Not now</string>
+    <string name="face_perm_denied_headline">Camera access is off</string>
+    <string name="face_perm_denied_body">Face check can\'t work without the camera. Open Settings, then Permissions, and allow Camera.</string>
+    <string name="face_perm_open_settings">Open settings</string>
+
+    <!-- Enrollment -->
+    <string name="face_enroll_title">Face enrollment</string>
+    <string name="face_enroll_approved">Approved by your admin</string>
+    <string name="face_enroll_intro_headline">Let\'s set up your face</string>
+    <string name="face_enroll_intro_body">It takes about 20 seconds.</string>
+    <string name="face_enroll_intro_body_reenroll">It takes about 20 seconds. Your new photo replaces the old one for face check.</string>
+    <string name="face_tip_light_title">Find good light</string>
+    <string name="face_tip_light_body">Face a window or a bright light</string>
+    <string name="face_tip_face_title">Show your whole face</string>
+    <string name="face_tip_face_body">Take off sunglasses, mask or cap</string>
+    <string name="face_tip_phone_title">Hold your phone at eye level</string>
+    <string name="face_tip_phone_body">Keep your face inside the oval</string>
+    <string name="face_enroll_start">Start</string>
+    <string name="face_enroll_privacy">Your photo is only used to check your attendance.</string>
+    <string name="face_pose_front">Front</string>
+    <string name="face_pose_left">Left</string>
+    <string name="face_pose_right">Right</string>
+    <string name="face_pose_up">Up</string>
+    <string name="face_enroll_pose_front">Look straight at the camera</string>
+    <string name="face_enroll_pose_left">Turn your head slowly left</string>
+    <string name="face_enroll_pose_right">Turn your head slowly right</string>
+    <string name="face_enroll_pose_up">Tilt your head slowly up</string>
+    <string name="face_enroll_help">Having trouble? Get help</string>
+    <string name="face_enroll_help_title">Tips</string>
+    <string name="face_enroll_help_body">Find good light and take off sunglasses, mask or cap. Hold your phone at eye level, turn your head slowly and hold each position for a moment.</string>
+    <string name="face_enroll_saving">Saving…</string>
+    <string name="face_enroll_failed">That didn\'t work</string>
+    <string name="face_enroll_failed_inconsistent">Make sure only you are in front of the camera, then try again.</string>
+    <string name="face_enroll_failed_error">Something went wrong. Please try again.</string>
+    <string name="face_enroll_done_named">You\'re all set, %1$s!</string>
+    <string name="face_enroll_done">You\'re all set!</string>
+    <string name="face_enroll_done_body">Your new face photo is saved. From your next Office In, face check will use it.</string>
+    <string name="face_continue_attendance">Continue to Attendance</string>
+
+    <!-- Repeated mismatch -->
+    <string name="face_mismatch_pill">Face didn\'t match</string>
+    <string name="face_mismatch_named">This keeps happening, %1$s</string>
+    <string name="face_mismatch">This keeps happening</string>
+    <string name="face_mismatch_count">%1$d of the last %2$d days</string>
+    <string name="face_mismatch_body">Your face didn\'t match on %1$s. Your saved face photo may be out of date. Ask your admin to let you set it up again.</string>
+    <string name="face_request_reenroll">Request face re-enrollment</string>
+    <string name="face_mismatch_note">You can still Office In today. It will be sent for approval.</string>
+
+    <!-- Re-enrollment request -->
+    <string name="face_reenroll_title">Face re-enrollment</string>
+    <string name="face_reenroll_ai">Your face didn\'t match on %1$s. Ask your admin to let you set up face check again.</string>
+    <string name="face_reenroll_row">Face didn\'t match</string>
+    <string name="face_reenroll_what_changed">What changed?</string>
+    <string name="face_reason_look">My look changed (beard, glasses, hair)</string>
+    <string name="face_reason_photo">My saved photo is old or unclear</string>
+    <string name="face_reason_other">Something else</string>
+    <string name="face_reenroll_note_label">Note for your admin (optional)</string>
+    <string name="face_reenroll_send">Send request to admin</string>
+    <string name="face_reenroll_send_failed">Couldn\'t send the request. Please try again.</string>
+
+    <!-- Re-enrollment requested -->
+    <string name="face_reenroll_request_id">Request #%1$s</string>
+    <string name="face_reenroll_sent_bold">Request sent to your admin.</string>
+    <string name="face_reenroll_sent_rest">We\'ll let you know as soon as they approve it.</string>
+    <string name="face_timeline_sent">Request sent</string>
+    <string name="face_timeline_sent_at">%1$s at %2$s</string>
+    <string name="face_timeline_waiting">Waiting for admin approval</string>
+    <string name="face_timeline_waiting_sub">Usually within 1 working day</string>
+    <string name="face_timeline_setup">Set up your face again</string>
+    <string name="face_timeline_setup_sub">You\'ll get a notification to start</string>
+    <string name="face_until_then">Until then</string>
+    <string name="face_until_then_attendance">You can keep doing Office In and Office Out as usual.</string>
+    <string name="face_until_then_approval">Days where your face doesn\'t match will need approval.</string>
+    <string name="face_back_to_attendance">Back to Attendance</string>
+</resources>

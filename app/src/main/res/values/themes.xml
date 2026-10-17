@@ -2,4 +2,9 @@
 <resources>
 
     <style name="Theme.WorkopoloFace" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Face check camera flow: dark window so nothing flashes white before Compose draws. -->
+    <style name="Theme.WorkopoloFace.FaceCheck" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/face_night</item>
+    </style>
 </resources>
