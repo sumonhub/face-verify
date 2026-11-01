@@ -32,8 +32,10 @@ object FrameGeometry {
         val newW = w * k
         val newH = h * k
         return CropBox(
-            left = (face.centerX - newW / 2f).coerceIn(0f, maxX - newW),
-            top = (face.centerY - newH / 2f).coerceIn(0f, maxY - newH),
+            // The room to slide can come out a hair below zero from float rounding, and coerceIn
+            // throws on an empty range, so never let the upper end drop under zero.
+            left = (face.centerX - newW / 2f).coerceIn(0f, maxOf(0f, maxX - newW)),
+            top = (face.centerY - newH / 2f).coerceIn(0f, maxOf(0f, maxY - newH)),
             width = newW,
             height = newH,
         )

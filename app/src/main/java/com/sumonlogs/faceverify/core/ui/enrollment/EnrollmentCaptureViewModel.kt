@@ -1,5 +1,6 @@
 package com.sumonlogs.faceverify.core.ui.enrollment
 
+import android.util.Log
 import com.sumonlogs.faceverify.core.api.ActiveFaceModel
 import com.sumonlogs.faceverify.core.api.EnrolledFace
 import com.sumonlogs.faceverify.core.api.FaceDiagnostics
@@ -62,8 +63,18 @@ class EnrollmentCaptureViewModel(
         }
     }
 
-    /** Runs on the analysis thread. */
+    /** Runs on the analysis thread. A processing failure is an enrollment failure, not a camera one. */
     private fun onFrame(frame: FaceFrame) {
+        try {
+            processFrame(frame)
+        } catch (e: Exception) {
+            Log.e(TAG, "Enrollment failed while processing a frame", e)
+            session = null
+            setState { copy(failure = EnrollFailure.EngineError, issue = null) }
+        }
+    }
+
+    private fun processFrame(frame: FaceFrame) {
         val current = session ?: return
         if (currentState.saving || currentState.failure != null || currentState.duplicateOf != null) return
         val step = current.onFrame(frame)
@@ -95,6 +106,7 @@ class EnrollmentCaptureViewModel(
     }
 
     private companion object {
+        const val TAG = "FaceEnroll"
         const val ALIGNED_SIZE = 112
     }
 

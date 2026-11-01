@@ -1,5 +1,6 @@
 package com.sumonlogs.faceverify.core.ui.facecheck
 
+import android.util.Log
 import com.sumonlogs.faceverify.core.api.FaceDiagnostics
 import com.sumonlogs.faceverify.core.api.FaceFailure
 import com.sumonlogs.faceverify.core.api.FaceMatchResult
@@ -74,8 +75,20 @@ class FaceCheckViewModel(
         }
     }
 
-    /** Runs on the analysis thread. */
+    /**
+     * Runs on the analysis thread. A failure while processing a frame is a face-check failure, not a
+     * camera one, so it must not reach the analyzer, which would report "camera unavailable".
+     */
     private fun onFrame(frame: FaceFrame) {
+        try {
+            processFrame(frame)
+        } catch (e: Exception) {
+            Log.e(TAG, "Face check failed while processing a frame", e)
+            finish(FaceMatchResult.failed(FaceFailure.EngineError), FacePrompt.Failed)
+        }
+    }
+
+    private fun processFrame(frame: FaceFrame) {
         if (done || deciding) return
         val current = session ?: return
         val step = current.onFrame(frame)
@@ -203,6 +216,7 @@ class FaceCheckViewModel(
     }
 
     private companion object {
+        const val TAG = "FaceCheck"
         const val ALIGNED_SIZE = 112
         const val CHECKING_PROGRESS = 0.95f
         const val RESULT_HOLD_MS = 900L

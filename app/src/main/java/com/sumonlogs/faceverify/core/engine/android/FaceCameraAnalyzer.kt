@@ -1,6 +1,7 @@
 package com.sumonlogs.faceverify.core.engine.android
 
 import android.os.SystemClock
+import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.sumonlogs.faceverify.core.api.TimingSink
@@ -32,6 +33,7 @@ class FaceCameraAnalyzer(
             onTiming("detect", detectMs.toFloat())
             frame = ProxyFaceFrame(proxy, faces, detectMs, t0).also(onFrame)
         } catch (e: Exception) {
+            Log.w(TAG, "Frame analysis failed", e)
             onError(e)
         } finally {
             frame?.release()
@@ -80,6 +82,8 @@ class FaceCameraAnalyzer(
     }
 
     private companion object {
+        const val TAG = "FaceAnalyzer"
+
         /** Both face models take 112×112 crops. */
         const val ALIGN_SIZE = 112
 
