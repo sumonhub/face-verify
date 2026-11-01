@@ -43,6 +43,7 @@ class AlignmentAndQualityTest {
         fun issue(gray: Int, contrast: Int) = CropQuality.issue(CropQuality.stats(fakeCrop(0, gray, contrast), FAKE_CROP), config)
         assertNull(issue(130, 40))
         assertEquals(QualityIssue.TooDark, issue(20, 10))
+        assertNull("a dim but usable face is not turned away", issue(40, 40))
         assertEquals(QualityIssue.TooBright, issue(240, 10))
         assertEquals(QualityIssue.Blurry, issue(130, 0))
     }

@@ -24,7 +24,12 @@ data class FaceConfig(
     val stableFrames: Int = 4,
 
     // Face crop quality (see CropQuality)
-    val minBrightness: Float = 50f,
+    /**
+     * Mean brightness (0..255) of the face crop below which it is "too dark". Kept low on purpose: a
+     * normally lit face can read 40-60 on a front camera, especially against a bright background or on
+     * darker skin, and the model copes with that. Only a really dark crop is turned away.
+     */
+    val minBrightness: Float = 30f,
     val maxBrightness: Float = 215f,
     val minSharpness: Float = 15f,
     /** A dark, bright or blurry crop is rejected at once, but the hint only shows after this many frames in a row. */
