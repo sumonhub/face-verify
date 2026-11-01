@@ -22,8 +22,8 @@ enum class FacePrompt {
     Look, NoFace, MultipleFaces, TooFar, TooClose, NotCentred, TurnedAway, Tilted, EyesClosed,
     TooDark, TooBright, Blurry,
     Blink, TurnLeft, TurnRight,
-    HoldStill,
-    Matched, Mismatch, Ambiguous, LivenessFailed, NoFaceFailed, Failed, CameraUnavailable,
+    HoldStill, Checking,
+    Matched, Mismatch, Ambiguous, LivenessFailed, SpoofSuspected, NoFaceFailed, Failed, CameraUnavailable,
 }
 
 enum class RingTone { Progress, Success, Failure }

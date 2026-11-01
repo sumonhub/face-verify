@@ -1,6 +1,8 @@
 package com.sumonlogs.faceverify.core.engine.android
 
 import android.content.Context
+import android.os.SystemClock
+import com.sumonlogs.faceverify.core.api.TimingSink
 import com.sumonlogs.faceverify.core.engine.FaceEmbedder
 import com.sumonlogs.faceverify.core.engine.FaceMatcher
 import com.sumonlogs.faceverify.core.engine.FaceModelSpec
@@ -16,17 +18,28 @@ import java.util.concurrent.ConcurrentHashMap
  * Runs one face model on LiteRT. Reads batch size, layout (NHWC or NCHW) and embedding size from
  * the model itself. A model with a fixed batch > 1 (MobileFaceNet has 2) gets several faces per run.
  */
-class LiteRtFaceEmbedder(private val context: Context, override val model: FaceModelSpec) : FaceEmbedder {
+class LiteRtFaceEmbedder(
+    private val context: Context,
+    override val model: FaceModelSpec,
+    private val threads: Int = DEFAULT_THREADS,
+    private val onTiming: TimingSink = { _, _ -> },
+) : FaceEmbedder, AutoCloseable {
 
     override val inputSize: Int = INPUT_SIZE
 
-    private val interpreter: Interpreter by lazy {
+    private val interpreterLazy = lazy {
         val buffer = context.assets.openFd(model.assetFile).use { fd ->
             FileInputStream(fd.fileDescriptor).use { stream ->
                 stream.channel.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
             }
         }
-        Interpreter(buffer, Interpreter.Options().setNumThreads(THREADS))
+        Interpreter(buffer, Interpreter.Options().setNumThreads(threads))
+    }
+    private val interpreter: Interpreter get() = interpreterLazy.value
+
+    /** Frees the native model. Only for embedders made on the side, such as a benchmark. */
+    override fun close() {
+        if (interpreterLazy.isInitialized()) interpreterLazy.value.close()
     }
 
     private val inputShape: IntArray by lazy { interpreter.getInputTensor(0).shape() }
@@ -40,7 +53,9 @@ class LiteRtFaceEmbedder(private val context: Context, override val model: FaceM
     @Synchronized
     override fun embed(faces: List<IntArray>): List<FloatArray> {
         faces.forEach { require(it.size == INPUT_SIZE * INPUT_SIZE) { "Expected ${INPUT_SIZE}x$INPUT_SIZE pixels" } }
+        val t0 = SystemClock.elapsedRealtimeNanos()
         return faces.chunked(batch).flatMap { chunk -> run(chunk) }
+            .also { onTiming("embed", (SystemClock.elapsedRealtimeNanos() - t0) / 1_000_000f) }
     }
 
     /** One inference; unused batch slots repeat the last face and their output is dropped. */
@@ -72,16 +87,20 @@ class LiteRtFaceEmbedder(private val context: Context, override val model: FaceM
         PixelNormalization.Raw -> value.toFloat()
     }
 
-    private companion object {
+    companion object {
         const val INPUT_SIZE = 112
-        const val THREADS = 2
+        const val DEFAULT_THREADS = 2
     }
 }
 
 /** One embedder per model, created on first use. */
-class FaceEmbedders(private val context: Context) {
+class FaceEmbedders(
+    private val context: Context,
+    private val threads: Int = LiteRtFaceEmbedder.DEFAULT_THREADS,
+    private val onTiming: TimingSink = { _, _ -> },
+) {
     private val cache = ConcurrentHashMap<String, FaceEmbedder>()
 
     fun forModel(model: FaceModelSpec): FaceEmbedder =
-        cache.getOrPut(model.id) { LiteRtFaceEmbedder(context, model) }
+        cache.getOrPut(model.id) { LiteRtFaceEmbedder(context, model, threads, onTiming) }
 }

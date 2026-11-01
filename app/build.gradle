@@ -20,7 +20,15 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled = false
+            // R8 shrinks and optimises the code. The keep rules for the libraries that use reflection
+            // are in src/main/keepRules/rules.keep.
+            minifyEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            // Phones are arm64 or (older) 32-bit arm. x86 and x86_64 are emulator-only and made up a third
+            // of the APK, so only release drops them; debug keeps them for emulators.
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
         }
     }
     compileOptions {
@@ -72,6 +80,9 @@ dependencies {
     implementation 'androidx.camera:camera-view:1.4.2'
     implementation 'com.google.mlkit:face-detection:16.1.7'
     implementation 'com.google.ai.edge.litert:litert:1.4.1'
+
+    // Installs the baseline profile (src/main/baseline-prof.txt) so the first run is already compiled.
+    implementation 'androidx.profileinstaller:profileinstaller:1.4.1'
 
     testImplementation 'junit:junit:4.13.2'
 }

@@ -14,15 +14,27 @@ sealed interface VerifyStep {
     /** Step 3 of 3: facing the camera again while the match frames are taken. */
     data class Capture(val issue: QualityIssue?, val progress: Float) : VerifyStep
 
+    /**
+     * Every frame is in. The model work is in [check]; the caller runs it off the camera thread and
+     * shows a "checking" state meanwhile. The session ignores further frames.
+     */
+    data class Deciding(val check: PendingCheck) : VerifyStep
+
     data class Finished(val result: FaceMatchResult) : VerifyStep
+}
+
+/** The slow part of a face check, with its inputs copied out of the camera frames so any thread can run it. */
+class PendingCheck internal constructor(private val work: () -> FaceMatchResult) {
+    fun run(): FaceMatchResult = work()
 }
 
 data class VerifyTimings(val detectMs: Long, val embedMs: Long?, val totalMs: Long)
 
 /**
  * One face check: align → liveness challenge → capture [FaceConfig.verifyFrames] good front frames →
- * identify among [people] using the average of those frames. The same tracked face must be seen from
- * the challenge to the last capture, otherwise it starts over.
+ * hand back a [PendingCheck] that scores them for spoofing and identifies among [people] using their
+ * average. The same tracked face must be seen from the challenge to the last capture, otherwise it
+ * starts over.
  */
 class VerificationSession(
     private val config: FaceConfig,
@@ -30,6 +42,7 @@ class VerificationSession(
     val challenge: LivenessChallenge,
     private val people: List<FaceRecord>,
     private val embedder: FaceEmbedder,
+    private val spoofDetector: SpoofDetector? = null,
     private val nanoTime: () -> Long = System::nanoTime,
 ) {
     private enum class Stage { Align, Liveness, Capture }
@@ -45,22 +58,40 @@ class VerificationSession(
     private var lastCropAtMs: Long? = null
     private var selfie: ByteArray? = null
     private var finished: VerifyStep.Finished? = null
+    private var deciding: VerifyStep.Deciding? = null
+    private val spoofCrops = mutableListOf<SpoofCrops?>()
 
     var lastFace: FaceObservation? = null
         private set
     var lastCrop: CropStats? = null
         private set
+
+    /** The latest aligned face crop the embedder would see, even when it was rejected. For the debug panel. */
+    var lastAligned: IntArray? = null
+        private set
+
+    // Written by the worker that runs the PendingCheck, read by the camera thread.
+    @Volatile
     var timings: VerifyTimings? = null
         private set
+
+    @Volatile
     var identification: Identification? = null
         private set
 
+    /** Mean real-face probability over the capture frames; null until the check has scored them. */
+    @Volatile
+    var lastSpoofScore: Float? = null
+        private set
+
     /** Id of the best-scoring enrolled person (matched or not), for calibration. */
+    @Volatile
     var bestFaceId: String? = null
         private set
 
     fun onFrame(frame: FaceFrame): VerifyStep {
         finished?.let { return it }
+        deciding?.let { return it }
         val start = startedAtMs ?: frame.timestampMs.also { startedAtMs = it }
         val elapsed = frame.timestampMs - start
         timings = VerifyTimings(detectMs = frame.detectMs, embedMs = timings?.embedMs, totalMs = elapsed)
@@ -118,6 +149,7 @@ class VerificationSession(
 
         val pixels = frame.alignedFace(face)
             ?: return finish(FaceMatchResult.failed(FaceFailure.EngineError, frame.selfieJpeg(), livenessPassed = true))
+        lastAligned = pixels
         val stats = CropQuality.stats(pixels, embedder.inputSize)
         lastCrop = stats
         val cropIssue = CropQuality.issue(stats, config)
@@ -127,17 +159,50 @@ class VerificationSession(
         }
         if (crops.isEmpty()) selfie = frame.selfieJpeg()
         crops += pixels
+        // Copied out of the frame now: its pixels are gone once this call returns.
+        if (spoofDetector != null) spoofCrops += frame.spoofCrops(face)
         lastCropAtMs = frame.timestampMs
         if (crops.size < config.verifyFrames) return VerifyStep.Capture(null, captureProgress())
-        return finish(identify())
+        return decide()
     }
 
-    private fun identify(): FaceMatchResult {
+    /** Freezes the captured frames into a check that any thread can run. */
+    private fun decide(): VerifyStep {
+        val frames = crops.toList()
+        val wide = spoofCrops.toList()
+        val evidence = selfie
+        return VerifyStep.Deciding(PendingCheck { decideNow(frames, wide, evidence) }).also { deciding = it }
+    }
+
+    /** Anti-spoofing first, so a fake face is never embedded; then identification. */
+    private fun decideNow(frames: List<IntArray>, wide: List<SpoofCrops?>, evidence: ByteArray?): FaceMatchResult {
+        if (spoofDetector != null) {
+            val scores = wide.map { crops ->
+                crops?.let { spoofScore(spoofDetector, it) }
+                    ?: return FaceMatchResult.failed(FaceFailure.EngineError, evidence, livenessPassed = true)
+            }
+            val mean = scores.average().toFloat()
+            lastSpoofScore = mean
+            if (mean < config.spoofMinScore) {
+                return FaceMatchResult.failed(FaceFailure.SpoofSuspected, evidence, score = mean)
+            }
+        }
+        return identify(frames, evidence)
+    }
+
+    /** Null when the model fails; the check then ends as an engine error. */
+    private fun spoofScore(detector: SpoofDetector, crops: SpoofCrops): Float? = try {
+        detector.realProbability(crops)
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun identify(frames: List<IntArray>, evidence: ByteArray?): FaceMatchResult {
         val t0 = nanoTime()
         val probe = try {
-            FaceMatcher.centroid(embedder.embed(crops))
+            FaceMatcher.centroid(embedder.embed(frames))
         } catch (e: Exception) {
-            return FaceMatchResult.failed(FaceFailure.EngineError, selfie, livenessPassed = true)
+            return FaceMatchResult.failed(FaceFailure.EngineError, evidence, livenessPassed = true)
         }
         timings = timings?.copy(embedMs = (nanoTime() - t0) / 1_000_000)
         val result = FaceMatcher.identify(probe, people.map { it.templates }, threshold, config.identifyMargin)
@@ -150,16 +215,16 @@ class VerificationSession(
                 face = EnrolledFace(best.id, best.name, best.enrolledAtMillis, best.modelId),
                 score = result.score,
                 livenessPassed = true,
-                selfie = selfie,
+                selfie = evidence,
                 failure = null,
             )
-            result.ambiguous -> FaceMatchResult.failed(FaceFailure.AmbiguousMatch, selfie, livenessPassed = true, score = result.score)
+            result.ambiguous -> FaceMatchResult.failed(FaceFailure.AmbiguousMatch, evidence, livenessPassed = true, score = result.score)
             else -> FaceMatchResult(
                 matched = false,
                 face = null,
                 score = result.score,
                 livenessPassed = true,
-                selfie = selfie,
+                selfie = evidence,
                 failure = null,
             )
         }
@@ -190,6 +255,7 @@ class VerificationSession(
         liveness = LivenessChecker(challenge, config)
         livenessProgress = 0f
         crops.clear()
+        spoofCrops.clear()
         lastCropAtMs = null
         selfie = null
         return VerifyStep.Align(null)

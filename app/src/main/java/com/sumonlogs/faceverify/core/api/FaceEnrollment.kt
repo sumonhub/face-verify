@@ -2,6 +2,7 @@ package com.sumonlogs.faceverify.core.api
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.NavHost
@@ -9,10 +10,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.sumonlogs.faceverify.core.engine.android.FaceWarmUp
 import com.sumonlogs.faceverify.core.ui.enrollment.FaceEnrollCaptureRoute
 import com.sumonlogs.faceverify.core.ui.enrollment.FaceEnrollDoneScreen
 import com.sumonlogs.faceverify.core.ui.enrollment.FaceEnrollIntroScreen
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 /** Route of the whole enrollment flow; navigate here from the host's nav graph. */
 @Serializable
@@ -38,6 +41,9 @@ fun NavGraphBuilder.faceEnrollmentGraph(
 ) {
     navigation<FaceEnrollmentGraph>(startDestination = FaceEnrollIntroRoute) {
         composable<FaceEnrollIntroRoute> {
+            // The person types a name meanwhile; the models load in the background.
+            val warmUp: FaceWarmUp = koinInject()
+            LaunchedEffect(Unit) { warmUp.run(includeSpoof = false) }
             FaceEnrollIntroScreen(
                 onStart = { name -> navController.navigate(FaceEnrollCaptureRoute(name)) },
                 onClose = { onFinished(false) },

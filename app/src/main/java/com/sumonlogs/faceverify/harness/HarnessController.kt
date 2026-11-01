@@ -44,6 +44,7 @@ class HarnessController(
     private val settings: FaceModelSettings,
     private val diagnostics: FaceDiagnostics,
     private val calibration: CalibrationLog,
+    private val benchmark: PerformanceBenchmark,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -57,6 +58,11 @@ class HarnessController(
     val stats: StateFlow<CalibrationStats> = combine(calibration.samples, settings.active) { samples, model ->
         CalibrationStats.of(samples, model.model.id)
     }.stateIn(scope, SharingStarted.Eagerly, CalibrationStats(emptyList(), emptyList()))
+
+    init {
+        // The test app shows the aligned face crop; the real app never turns this on.
+        diagnostics.captureAlignedFace = true
+    }
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -86,6 +92,24 @@ class HarnessController(
         _lastCheck.value = check.copy(labelled = true)
         scope.launch { calibration.add(CalibrationSample(modelId, genuine, check.score)) }
     }
+
+    private val _bench = MutableStateFlow<BenchState>(BenchState.Idle)
+    val bench: StateFlow<BenchState> = _bench.asStateFlow()
+
+    fun runBenchmark() {
+        val model = active.value?.model ?: return
+        if (_busy.value || _bench.value == BenchState.Running) return
+        _bench.value = BenchState.Running
+        scope.launch {
+            _bench.value = try {
+                BenchState.Done(benchmark.run(model))
+            } catch (e: Exception) {
+                BenchState.Idle
+            }
+        }
+    }
+
+    fun clearTimings() = diagnostics.clearTimings()
 
     fun selectModel(modelId: String) {
         scope.launch {

@@ -23,6 +23,8 @@ enum class FaceFailure {
     MultipleFaces,
     PoorQuality,
     LivenessFailed,
+    /** The face looked like a photo, a screen or a print rather than a real person. */
+    SpoofSuspected,
     /** Two enrolled people scored too close to each other to tell them apart. */
     AmbiguousMatch,
     NotEnrolled,

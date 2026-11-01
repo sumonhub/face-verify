@@ -9,10 +9,13 @@ import com.sumonlogs.faceverify.core.api.FaceModelSettings
 import com.sumonlogs.faceverify.core.api.FaceVerifier
 import com.sumonlogs.faceverify.core.engine.FaceConfig
 import com.sumonlogs.faceverify.core.engine.FaceRecordStore
+import com.sumonlogs.faceverify.core.engine.SpoofDetector
 import com.sumonlogs.faceverify.core.engine.android.EncryptedFaceRecordStore
 import com.sumonlogs.faceverify.core.engine.android.FaceCropper
 import com.sumonlogs.faceverify.core.engine.android.KeystoreCipher
+import com.sumonlogs.faceverify.core.engine.android.LiteRtSpoofDetector
 import com.sumonlogs.faceverify.core.engine.android.FaceEmbedders
+import com.sumonlogs.faceverify.core.engine.android.FaceWarmUp
 import com.sumonlogs.faceverify.core.engine.android.MlKitFaceDetector
 import com.sumonlogs.faceverify.core.engine.android.faceTemplateDataStore
 import com.sumonlogs.faceverify.core.ui.enrollment.EnrollmentCaptureViewModel
@@ -31,7 +34,9 @@ val faceModule = module {
     // Engine
     single { MlKitFaceDetector() }
     single { FaceCropper() }
-    single { FaceEmbedders(androidContext()) }
+    single { FaceEmbedders(androidContext(), get<FaceConfig>().embedderThreads, get<FaceDiagnostics>()::recordTiming) }
+    single<SpoofDetector> { LiteRtSpoofDetector(androidContext(), get<FaceConfig>().spoofThreads, get<FaceDiagnostics>()::recordTiming) }
+    single { FaceWarmUp(get(), get(), get(), get(), get<FaceDiagnostics>()::recordTiming) }
     single<FaceRecordStore> { EncryptedFaceRecordStore(androidContext().faceTemplateDataStore, KeystoreCipher()) }
 
     // Public API
@@ -40,6 +45,6 @@ val faceModule = module {
     single<FaceVerifier> { DefaultFaceVerifier(get(), get(), get(), get(), get()) }
 
     // Screens
-    viewModel { FaceCheckViewModel(get(), get(), get(), get(), get()) }
-    viewModel { (name: String) -> EnrollmentCaptureViewModel(name, get(), get(), get(), get(), get()) }
+    viewModel { FaceCheckViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { (name: String) -> EnrollmentCaptureViewModel(name, get(), get(), get(), get(), get(), get()) }
 }

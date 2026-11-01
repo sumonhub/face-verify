@@ -140,10 +140,12 @@ private fun FacePrompt.texts(): Pair<Int, Int> {
         FacePrompt.TurnLeft -> R.string.face_challenge_left to R.string.face_sub_checking_live
         FacePrompt.TurnRight -> R.string.face_challenge_right to R.string.face_sub_checking_live
         FacePrompt.HoldStill -> R.string.face_capture_title to R.string.face_capture_sub
+        FacePrompt.Checking -> R.string.face_checking_title to R.string.face_checking_sub
         FacePrompt.Matched -> R.string.face_result_matched to R.string.face_result_matched_sub
         FacePrompt.Mismatch -> R.string.face_result_mismatch to R.string.face_result_mismatch_sub
         FacePrompt.Ambiguous -> R.string.face_result_ambiguous to retry
         FacePrompt.LivenessFailed -> R.string.face_result_liveness to retry
+        FacePrompt.SpoofSuspected -> R.string.face_result_spoof to R.string.face_result_spoof_sub
         FacePrompt.NoFaceFailed -> R.string.face_result_no_face to retry
         FacePrompt.Failed -> R.string.face_result_failed to retry
         FacePrompt.CameraUnavailable -> R.string.face_camera_unavailable to retry

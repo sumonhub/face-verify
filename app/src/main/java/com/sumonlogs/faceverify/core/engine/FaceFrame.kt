@@ -40,6 +40,9 @@ interface FaceFrame {
     /** The face cropped and aligned to the model input, as ARGB pixels, or null if it can't be cropped. */
     fun alignedFace(face: FaceObservation): IntArray?
 
+    /** Wide crops of the face for anti-spoofing, or null when the frame can't provide them. */
+    fun spoofCrops(face: FaceObservation): SpoofCrops? = null
+
     /** The whole frame as a downscaled JPEG, kept as evidence of the check. */
     fun selfieJpeg(): ByteArray?
 }

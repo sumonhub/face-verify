@@ -1,0 +1,11 @@
+spoof_model_scale_2_7.tflite, spoof_model_scale_4_0.tflite
+
+Source:  https://github.com/shubham0204/OnDevice-Face-Recognition-Android
+         (app/src/main/assets/, downloaded 2026-11-01), Apache-2.0
+         sha256 scale_2_7: 5d573d20b795a19d7b2a0f67cc4c1130ce8ec30d5f6aa06b2c788a344a49d4dd
+         sha256 scale_4_0: 32eecfa06cd0cf3c514276fb8521ed820fc256bacf4c616a1f05612d1c156463
+
+Model:   MiniFASNetV2 / MiniFASNetV1SE from https://github.com/minivision-ai/Silent-Face-Anti-Spoofing
+         (Apache-2.0), converted PyTorch -> ONNX -> TFLite.
+Input:   80x80 BGR, raw 0..255 floats, face box enlarged 2.7x (V2) and 4.0x (V1SE).
+Output:  3 logits; softmax class 1 = real face, the others are spoof attacks.

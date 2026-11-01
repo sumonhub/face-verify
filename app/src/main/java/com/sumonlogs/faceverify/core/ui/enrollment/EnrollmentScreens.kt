@@ -57,6 +57,7 @@ import com.sumonlogs.faceverify.core.ui.components.FaceOval
 import com.sumonlogs.faceverify.core.ui.components.FaceOvalPlaceholder
 import com.sumonlogs.faceverify.core.ui.components.FacePill
 import com.sumonlogs.faceverify.core.ui.components.LivePulseDot
+import com.sumonlogs.faceverify.core.ui.components.MaxScreenBrightness
 import com.sumonlogs.faceverify.core.ui.components.StepBar
 import com.sumonlogs.faceverify.core.ui.components.hintRes
 import com.sumonlogs.faceverify.core.ui.permission.CameraPermissionGate
@@ -185,6 +186,7 @@ fun FaceEnrollCaptureRoute(
         }
     }
     CameraPermissionGate(title = stringResource(R.string.face_enroll_title), onDismiss = onPermissionDismissed) {
+        MaxScreenBrightness()
         LaunchedEffect(Unit) { viewModel.onIntent(EnrollmentCaptureIntent.Start) }
         FaceEnrollCaptureScreen(
             state = state,
@@ -238,9 +240,6 @@ fun FaceEnrollCaptureScreen(
             ) {
                 FaceOvalPlaceholder(iconSize = 92.dp)
                 if (!state.cameraUnavailable) camera()
-                if (!failed && !state.saving && state.pose == EnrollPose.Up) {
-                    FaceIcon(FaceGlyph.Up, null, 44.dp, 2.2f, FaceColors.Sky, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
-                }
             }
             if (!failed && !state.saving) {
                 when (state.pose) {
@@ -252,7 +251,7 @@ fun FaceEnrollCaptureScreen(
                         FaceGlyph.Forward, null, 44.dp, 2.2f, FaceColors.Sky,
                         Modifier.align(Alignment.CenterEnd).offset(x = 54.dp),
                     )
-                    EnrollPose.Front, EnrollPose.Up -> Unit
+                    EnrollPose.Front -> Unit
                 }
             }
         }
@@ -317,14 +316,12 @@ private fun EnrollPose.instructionRes(): Int = when (this) {
     EnrollPose.Front -> R.string.face_enroll_pose_front
     EnrollPose.Left -> R.string.face_enroll_pose_left
     EnrollPose.Right -> R.string.face_enroll_pose_right
-    EnrollPose.Up -> R.string.face_enroll_pose_up
 }
 
 private fun EnrollPose.labelRes(): Int = when (this) {
     EnrollPose.Front -> R.string.face_pose_front
     EnrollPose.Left -> R.string.face_pose_left
     EnrollPose.Right -> R.string.face_pose_right
-    EnrollPose.Up -> R.string.face_pose_up
 }
 
 // ---------------------------------------------------------------- Done

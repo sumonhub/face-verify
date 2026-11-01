@@ -14,6 +14,7 @@ import com.sumonlogs.faceverify.core.engine.FaceMatcher
 import com.sumonlogs.faceverify.core.engine.FaceRecord
 import com.sumonlogs.faceverify.core.engine.FaceRecordStore
 import com.sumonlogs.faceverify.core.engine.android.FaceEmbedders
+import com.sumonlogs.faceverify.core.engine.android.FaceWarmUp
 import com.sumonlogs.faceverify.core.mvi.BaseViewModel
 import java.util.UUID
 
@@ -25,6 +26,7 @@ class EnrollmentCaptureViewModel(
     private val embedders: FaceEmbedders,
     private val config: FaceConfig,
     private val diagnostics: FaceDiagnostics,
+    private val warmUp: FaceWarmUp,
 ) : BaseViewModel<EnrollmentCaptureIntent, EnrollmentCaptureState, EnrollmentCaptureEffect>(EnrollmentCaptureState()) {
 
     @Volatile
@@ -51,6 +53,7 @@ class EnrollmentCaptureViewModel(
     }
 
     private fun start() {
+        launchSafely { warmUp.run(includeSpoof = false) }
         launchSafely(onError = { setState { copy(failure = EnrollFailure.EngineError) } }) {
             val model = settings.current()
             active = model
@@ -64,6 +67,7 @@ class EnrollmentCaptureViewModel(
         val current = session ?: return
         if (currentState.saving || currentState.failure != null || currentState.duplicateOf != null) return
         val step = current.onFrame(frame)
+        current.lastAligned?.let { diagnostics.showAlignedFace(it, ALIGNED_SIZE) }
         val face = current.lastFace
         diagnostics.update {
             copy(
@@ -88,6 +92,10 @@ class EnrollmentCaptureViewModel(
                 save(step.templates)
             }
         }
+    }
+
+    private companion object {
+        const val ALIGNED_SIZE = 112
     }
 
     private fun save(templates: List<FloatArray>) {

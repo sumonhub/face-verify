@@ -34,13 +34,30 @@ data class FaceConfig(
     val turnYawDeg: Float = 20f,
     val livenessTimeoutMs: Long = 8_000L,
 
+    // Anti-spoofing
+    /**
+     * The face is rejected as fake when the average real-face probability over the capture frames is
+     * below this. 0.5 is the model's own decision point; tune it on real attack data.
+     */
+    val spoofMinScore: Float = 0.5f,
+
     // Enrollment
     val enrollTurnYawDeg: Float = 18f,
-    val enrollUpPitchDeg: Float = 12f,
     /** Front-facing frames embedded and averaged into a person's template. */
     val enrollFrontFrames: Int = 5,
     /** Every enrollment frame must be at least this similar to their average, or enrollment fails. */
     val enrollConsistencyMin: Float = 0.5f,
+
+    // Inference
+    /** CPU threads for the face-embedding model. */
+    val embedderThreads: Int = 2,
+    /** CPU threads for each anti-spoof model. */
+    val spoofThreads: Int = 2,
+
+    // Camera
+    /** The live preview is capped near this size (4:3): sharp enough for the oval, light on the GPU. */
+    val previewWidth: Int = 960,
+    val previewHeight: Int = 720,
 
     // Session
     val verifyTimeoutMs: Long = 25_000L,

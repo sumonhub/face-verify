@@ -1,5 +1,6 @@
 package com.sumonlogs.faceverify.harness
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -42,10 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sumonlogs.faceverify.R
 import com.sumonlogs.faceverify.core.api.ActiveFaceModel
+import com.sumonlogs.faceverify.core.api.AlignedPreview
 import com.sumonlogs.faceverify.core.api.EnrolledFace
 import com.sumonlogs.faceverify.core.api.FaceDebugInfo
 import com.sumonlogs.faceverify.core.api.FaceDiagnostics
 import com.sumonlogs.faceverify.core.api.FaceMatchResult
+import com.sumonlogs.faceverify.core.api.StageTiming
 import com.sumonlogs.faceverify.core.engine.FaceModels
 import com.sumonlogs.faceverify.core.ui.components.FaceButton
 import com.sumonlogs.faceverify.core.ui.components.FaceGlyph
@@ -68,8 +72,14 @@ fun HomeRoute(
     val lastCheck by controller.lastCheck.collectAsStateWithLifecycle()
     val stats by controller.stats.collectAsStateWithLifecycle()
     val debug by diagnostics.info.collectAsStateWithLifecycle()
+    val timings by diagnostics.stageTimings.collectAsStateWithLifecycle()
+    val aligned by diagnostics.alignedFace.collectAsStateWithLifecycle()
+    val bench by controller.bench.collectAsStateWithLifecycle()
     HomeScreen(
-        HomeUi(faces = faces, active = active, busy = busy, lastCheck = lastCheck, stats = stats, debug = debug),
+        HomeUi(
+            faces = faces, active = active, busy = busy, lastCheck = lastCheck, stats = stats, debug = debug,
+            timings = timings, aligned = aligned, bench = bench,
+        ),
         HomeActions(
             onEnroll = onEnroll,
             onVerify = controller::verify,
@@ -78,6 +88,8 @@ fun HomeRoute(
             onThreshold = controller::setThreshold,
             onLabel = controller::label,
             onClearCalibration = controller::clearCalibration,
+            onBenchmark = controller::runBenchmark,
+            onClearTimings = controller::clearTimings,
         ),
     )
 }
@@ -89,6 +101,9 @@ data class HomeUi(
     val lastCheck: LastCheck?,
     val stats: CalibrationStats,
     val debug: FaceDebugInfo,
+    val timings: List<StageTiming> = emptyList(),
+    val aligned: AlignedPreview? = null,
+    val bench: BenchState = BenchState.Idle,
 )
 
 class HomeActions(
@@ -100,6 +115,8 @@ class HomeActions(
     val onThreshold: (Float?) -> Unit,
     val onLabel: (CheckLabel) -> Unit,
     val onClearCalibration: () -> Unit,
+    val onBenchmark: () -> Unit = {},
+    val onClearTimings: () -> Unit = {},
 )
 
 @Composable
@@ -128,7 +145,8 @@ fun HomeScreen(ui: HomeUi, actions: HomeActions) {
         ui.lastCheck?.let { ResultCard(it, usable, actions.onLabel) }
         if (ui.active != null) CalibrationCard(ui.active, ui.stats, actions)
         EnrolledList(ui.faces, activeId, onDeleteRequest = { pendingDeleteId = it.id })
-        DebugPanel(ui.lastCheck?.result, ui.debug)
+        PerformanceCard(ui, actions)
+        DebugPanel(ui.lastCheck?.result, ui.debug, ui.aligned)
     }
 
     val pending = ui.faces?.firstOrNull { it.id == pendingDeleteId }
@@ -294,7 +312,7 @@ private fun EnrolledRow(face: EnrolledFace, usable: Boolean, onDeleteRequest: (E
 }
 
 @Composable
-private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo) {
+private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo, aligned: AlignedPreview?) {
     Card {
         Text(stringResource(R.string.harness_debug_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
         DebugRow(R.string.harness_debug_model, debug.modelId?.let { FaceModels.byId(it)?.displayName ?: it })
@@ -304,6 +322,7 @@ private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo) {
         DebugRow(R.string.harness_debug_matched, debug.lastMatched?.toString())
         DebugRow(R.string.harness_debug_challenge, debug.livenessChallenge)
         DebugRow(R.string.harness_debug_liveness, debug.livenessPassed?.toString())
+        DebugRow(R.string.harness_debug_spoof, debug.spoofScore?.let(::fmt))
         DebugRow(R.string.harness_debug_failure, debug.lastFailure?.name)
         DebugRow(R.string.harness_debug_quality, debug.qualityIssue)
         DebugRow(R.string.harness_debug_brightness, debug.cropBrightness?.let { String.format(Locale.US, "%.0f", it) })
@@ -314,6 +333,20 @@ private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo) {
         DebugRow(R.string.harness_debug_embed, debug.embedMs?.let { "$it ms" })
         DebugRow(R.string.harness_debug_total, debug.totalMs?.let { "$it ms" })
         DebugRow(R.string.harness_debug_selfie, result?.selfie?.let { "${it.size / 1024} KB" })
+
+        if (aligned != null) {
+            val bitmap = remember(aligned) {
+                Bitmap.createBitmap(aligned.pixels, aligned.size, aligned.size, Bitmap.Config.ARGB_8888).asImageBitmap()
+            }
+            Text(stringResource(R.string.harness_debug_aligned), style = FaceTypography.Debug, color = FaceColors.TextMuted, modifier = Modifier.padding(top = 8.dp))
+            Image(
+                bitmap = bitmap,
+                contentDescription = stringResource(R.string.harness_debug_aligned),
+                contentScale = ContentScale.Fit,
+                filterQuality = FilterQuality.None,
+                modifier = Modifier.size(168.dp),
+            )
+        }
 
         val selfie = result?.selfie
         if (selfie != null) {
@@ -329,6 +362,44 @@ private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo) {
         }
     }
 }
+
+@Composable
+private fun PerformanceCard(ui: HomeUi, actions: HomeActions) {
+    Card {
+        Text(stringResource(R.string.harness_perf_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
+        if (ui.timings.isEmpty()) {
+            Text(stringResource(R.string.harness_perf_empty), style = FaceTypography.Body, color = FaceColors.TextMuted)
+        } else {
+            Text(stringResource(R.string.harness_perf_header), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
+            ui.timings.forEach { PerfRow(it.stage, "${it.count} · ${ms(it.avgMs)} · ${ms(it.p95Ms)}") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(actions.onClearTimings, enabled = ui.timings.isNotEmpty()) {
+                Text(stringResource(R.string.harness_perf_clear), style = FaceTypography.LabelSemiBold)
+            }
+            TextButton(actions.onBenchmark, enabled = !ui.busy && ui.bench != BenchState.Running && ui.active != null) {
+                Text(
+                    stringResource(if (ui.bench == BenchState.Running) R.string.harness_perf_running else R.string.harness_perf_bench),
+                    style = FaceTypography.LabelSemiBold,
+                )
+            }
+        }
+        (ui.bench as? BenchState.Done)?.let { done ->
+            Text(stringResource(R.string.harness_perf_bench_header), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
+            done.rows.forEach { PerfRow("${it.label} · ${it.threads}T", "${ms(it.timing.avgMs)} · ${ms(it.timing.p95Ms)}") }
+        }
+    }
+}
+
+@Composable
+private fun PerfRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = FaceTypography.Debug, color = FaceColors.TextMuted, modifier = Modifier.weight(1f))
+        Text(value, style = FaceTypography.Debug, color = FaceColors.TextPrimary)
+    }
+}
+
+private fun ms(value: Float): String = String.format(Locale.US, "%.1f", value)
 
 @Composable
 private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {

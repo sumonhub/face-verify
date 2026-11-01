@@ -40,6 +40,7 @@
     <string name="harness_debug_runner_up">দ্বিতীয় সেরা স্কোর</string>
     <string name="harness_debug_matched">মিলেছে</string>
     <string name="harness_debug_challenge">লাইভনেস চ্যালেঞ্জ</string>
+    <string name="harness_debug_spoof">আসল মুখের স্কোর</string>
     <string name="harness_debug_liveness">লাইভনেস পাস</string>
     <string name="harness_debug_failure">ব্যর্থতা</string>
     <string name="harness_debug_quality">ফ্রেমের সমস্যা</string>
@@ -50,5 +51,13 @@
     <string name="harness_debug_detect">শনাক্তকরণ</string>
     <string name="harness_debug_embed">এমবেডিং</string>
     <string name="harness_debug_total">চেকের সময়</string>
+    <string name="harness_debug_aligned">অ্যালাইন করা মুখ (মডেল যা দেখে)</string>
+    <string name="harness_perf_title">পারফরম্যান্স</string>
+    <string name="harness_perf_empty">টাইমিং পেতে একটি চেক চালান। রিলিজ বিল্ড ব্যবহার করুন।</string>
+    <string name="harness_perf_header">ধাপ · বার · গড় ms · p95 ms</string>
+    <string name="harness_perf_clear">মুছুন</string>
+    <string name="harness_perf_bench">থ্রেড বেঞ্চমার্ক</string>
+    <string name="harness_perf_running">বেঞ্চমার্ক চলছে…</string>
+    <string name="harness_perf_bench_header">মডেল ও CPU থ্রেড (T) · গড় ms · p95 ms</string>
     <string name="harness_debug_selfie">সেলফি</string>
 </resources>

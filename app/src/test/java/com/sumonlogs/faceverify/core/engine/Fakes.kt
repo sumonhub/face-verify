@@ -41,7 +41,20 @@ class FakeFrame(
     override val height = FRAME_H
     override val detectMs = 5L
     override fun alignedFace(face: FaceObservation): IntArray = fakeCrop(pixelTag, gray, contrast)
+    override fun spoofCrops(face: FaceObservation) = SpoofCrops(IntArray(4), IntArray(4))
     override fun selfieJpeg(): ByteArray = byteArrayOf(1, 2, 3)
+}
+
+/** Returns [scores] in turn (the last one repeats), or throws when [fail] is set. */
+class FakeSpoofDetector(private vararg val scores: Float, private val fail: Boolean = false) : SpoofDetector {
+    override val inputSize = 2
+    var calls = 0
+        private set
+
+    override fun realProbability(crops: SpoofCrops): Float {
+        if (fail) error("model crashed")
+        return scores[minOf(calls++, scores.lastIndex)]
+    }
 }
 
 class FakeEmbedder : FaceEmbedder {

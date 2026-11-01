@@ -2,7 +2,7 @@ package com.sumonlogs.faceverify.core.engine
 
 import kotlin.math.abs
 
-enum class EnrollPose { Front, Left, Right, Up }
+enum class EnrollPose { Front, Left, Right }
 
 enum class EnrollFailure { Inconsistent, EngineError }
 
@@ -23,7 +23,7 @@ sealed interface EnrollStep {
 
 /**
  * Enrolls one person. First [FaceConfig.enrollFrontFrames] good front-facing frames are captured;
- * those become the template. Then left, right and up must each be held for [FaceConfig.stableFrames]
+ * those become the template. Then left and right must each be held for [FaceConfig.stableFrames]
  * frames: that proves a live, moving head, but those side views are not stored, because turned faces
  * make a template less specific. The same tracked face must stay in view; if it changes, it starts over.
  */
@@ -42,6 +42,10 @@ class EnrollmentSession(
     var lastFace: FaceObservation? = null
         private set
     var lastCrop: CropStats? = null
+        private set
+
+    /** The latest aligned face crop the embedder would see, even when it was rejected. For the debug panel. */
+    var lastAligned: IntArray? = null
         private set
 
     private val currentPose: EnrollPose get() = poses.firstOrNull { it !in done } ?: poses.last()
@@ -72,6 +76,7 @@ class EnrollmentSession(
     private fun front(frame: FaceFrame, face: FaceObservation): EnrollStep {
         if (tooSoon(frame.timestampMs)) return posing(null)
         val pixels = frame.alignedFace(face) ?: return fail(EnrollFailure.EngineError)
+        lastAligned = pixels
         val stats = CropQuality.stats(pixels, embedder.inputSize)
         lastCrop = stats
         val issue = CropQuality.issue(stats, config)
@@ -133,7 +138,6 @@ class EnrollmentSession(
         EnrollPose.Front -> FrameQuality.isFront(face, config) && FrameQuality.eyesOpen(face, config)
         EnrollPose.Left -> face.yaw >= config.enrollTurnYawDeg && abs(face.pitch) <= config.maxFrontPitchDeg * 1.5f
         EnrollPose.Right -> face.yaw <= -config.enrollTurnYawDeg && abs(face.pitch) <= config.maxFrontPitchDeg * 1.5f
-        EnrollPose.Up -> face.pitch >= config.enrollUpPitchDeg && abs(face.yaw) <= config.maxFrontYawDeg
     }
 
     /** Frames used for embeddings must be [FaceConfig.captureSpacingMs] apart, so they aren't near-duplicates. */

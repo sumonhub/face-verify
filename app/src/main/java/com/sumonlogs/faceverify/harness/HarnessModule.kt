@@ -6,5 +6,6 @@ import org.koin.dsl.module
 /** Test-app only. */
 val harnessModule = module {
     single { CalibrationLog(androidContext()) }
-    single { HarnessController(get(), get(), get(), get()) }
+    single { PerformanceBenchmark(androidContext()) }
+    single { HarnessController(get(), get(), get(), get(), get()) }
 }

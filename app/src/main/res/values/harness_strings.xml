@@ -40,6 +40,7 @@
     <string name="harness_debug_runner_up">Runner-up score</string>
     <string name="harness_debug_matched">Matched</string>
     <string name="harness_debug_challenge">Liveness challenge</string>
+    <string name="harness_debug_spoof">Real-face score</string>
     <string name="harness_debug_liveness">Liveness passed</string>
     <string name="harness_debug_failure">Failure</string>
     <string name="harness_debug_quality">Frame issue</string>
@@ -50,5 +51,13 @@
     <string name="harness_debug_detect">Detection</string>
     <string name="harness_debug_embed">Embedding</string>
     <string name="harness_debug_total">Check duration</string>
+    <string name="harness_debug_aligned">Aligned face (what the model sees)</string>
+    <string name="harness_perf_title">Performance</string>
+    <string name="harness_perf_empty">Run a check to collect timings. Use a release build.</string>
+    <string name="harness_perf_header">Stage · runs · average ms · p95 ms</string>
+    <string name="harness_perf_clear">Clear</string>
+    <string name="harness_perf_bench">Benchmark threads</string>
+    <string name="harness_perf_running">Benchmarking…</string>
+    <string name="harness_perf_bench_header">Per model and CPU threads (T) · average ms · p95 ms</string>
     <string name="harness_debug_selfie">Selfie</string>
 </resources>

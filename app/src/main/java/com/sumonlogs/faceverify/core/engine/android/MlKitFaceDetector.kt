@@ -2,7 +2,9 @@ package com.sumonlogs.faceverify.core.engine.android
 
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
+import android.graphics.Color
 import androidx.camera.core.ImageProxy
+import androidx.core.graphics.createBitmap
 import com.sumonlogs.faceverify.core.engine.FaceObservation
 import com.sumonlogs.faceverify.core.engine.Point
 import com.google.android.gms.tasks.Tasks
@@ -33,6 +35,16 @@ class MlKitFaceDetector {
         return Tasks.await(client.process(input)).map { it.toObservation() }
     }
 
+    /** Loads the model by running it once on a blank image. Blocks; call off the main thread. */
+    fun warmUp() {
+        val blank = createBitmap(WARM_UP_SIZE, WARM_UP_SIZE).apply { eraseColor(Color.GRAY) }
+        try {
+            Tasks.await(client.process(InputImage.fromBitmap(blank, 0)))
+        } finally {
+            blank.recycle()
+        }
+    }
+
     private fun Face.toObservation(): FaceObservation {
         val box = boundingBox
         return FaceObservation(
@@ -52,5 +64,9 @@ class MlKitFaceDetector {
             mouthRight = getLandmark(FaceLandmark.MOUTH_RIGHT)?.position?.let { Point(it.x, it.y) },
             trackingId = trackingId,
         )
+    }
+
+    private companion object {
+        const val WARM_UP_SIZE = 256
     }
 }

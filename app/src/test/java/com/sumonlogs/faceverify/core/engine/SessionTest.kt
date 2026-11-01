@@ -4,6 +4,7 @@ import com.sumonlogs.faceverify.core.api.FaceFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,8 +14,11 @@ class SessionTest {
     private val alex = FaceRecord("a", "Alex", 0L, FaceModels.SFace.id, listOf(floatArrayOf(1f, 0f, 0f)))
     private val sam = FaceRecord("s", "Sam", 0L, FaceModels.SFace.id, listOf(floatArrayOf(0f, 0f, 1f)))
 
-    private fun session(people: List<FaceRecord> = listOf(alex, sam), embedder: FaceEmbedder = FakeEmbedder()) =
-        VerificationSession(config, threshold, LivenessChallenge.Blink, people, embedder)
+    private fun session(
+        people: List<FaceRecord> = listOf(alex, sam),
+        embedder: FaceEmbedder = FakeEmbedder(),
+        spoof: SpoofDetector? = null,
+    ) = VerificationSession(config, threshold, LivenessChallenge.Blink, people, embedder, spoof)
 
     /** Feeds frames 66 ms apart (≈15 fps). */
     private class Clock {
@@ -22,10 +26,14 @@ class SessionTest {
         fun next(): Long = t.also { t += 66 }
     }
 
+    /** The app runs the final check on a worker; here it runs inline so the result can be asserted. */
+    private fun VerifyStep.resolve(): VerifyStep =
+        if (this is VerifyStep.Deciding) VerifyStep.Finished(check.run()) else this
+
     /** Plays align → blink → capture and returns the last step. */
     private fun VerificationSession.playLive(pixelTag: Int = 0, captureTrackingId: Int = 1): VerifyStep {
         val clock = Clock()
-        fun feed(f: FaceObservation) = onFrame(FakeFrame(clock.next(), listOf(f), pixelTag))
+        fun feed(f: FaceObservation) = onFrame(FakeFrame(clock.next(), listOf(f), pixelTag)).resolve()
         repeat(config.stableFrames) { feed(face()) }
         feed(face(eyes = 0.95f))
         feed(face(eyes = 0.05f))
@@ -85,6 +93,60 @@ class SessionTest {
     }
 
     @Test
+    fun `last capture frame hands back a check without running any model`() {
+        val embedder = FakeEmbedder()
+        val spoof = FakeSpoofDetector(0.95f)
+        val s = session(embedder = embedder, spoof = spoof)
+        val clock = Clock()
+        fun feed(f: FaceObservation) = s.onFrame(FakeFrame(clock.next(), listOf(f)))
+        repeat(config.stableFrames) { feed(face()) }
+        listOf(0.95f, 0.05f, 0.95f).forEach { feed(face(eyes = it)) }
+        var step: VerifyStep = VerifyStep.Align(null)
+        repeat(12) { if (step !is VerifyStep.Deciding) step = feed(face()) }
+
+        val deciding = step as VerifyStep.Deciding
+        assertEquals("nothing heavy ran on the camera thread", 0, embedder.calls + spoof.calls)
+        assertSame("later frames get the same check back", deciding, feed(face()))
+        assertTrue(deciding.check.run().matched)
+        assertEquals(1, embedder.calls)
+        assertEquals(config.verifyFrames, spoof.calls)
+    }
+
+    @Test
+    fun `real face passes anti-spoofing and is identified`() {
+        val spoof = FakeSpoofDetector(0.95f)
+        val result = (session(spoof = spoof).playLive() as VerifyStep.Finished).result
+        assertTrue(result.matched)
+        assertEquals("one score per capture frame", config.verifyFrames, spoof.calls)
+    }
+
+    @Test
+    fun `replayed face that passes liveness is rejected as a spoof and never matched`() {
+        val embedder = FakeEmbedder()
+        val s = session(embedder = embedder, spoof = FakeSpoofDetector(0.1f))
+        val result = (s.playLive() as VerifyStep.Finished).result
+        assertFalse(result.matched)
+        assertNull(result.face)
+        assertEquals(FaceFailure.SpoofSuspected, result.failure)
+        assertFalse("must stay out of calibration", result.livenessPassed)
+        assertEquals("a spoof is never embedded", 0, embedder.calls)
+    }
+
+    @Test
+    fun `one doubtful frame among good ones does not fail the check`() {
+        // mean of 0.9, 0.4, 0.95 is above the 0.5 minimum
+        val result = (session(spoof = FakeSpoofDetector(0.9f, 0.4f, 0.95f)).playLive() as VerifyStep.Finished).result
+        assertTrue(result.matched)
+    }
+
+    @Test
+    fun `anti-spoof model failure ends the check as an engine error`() {
+        val result = (session(spoof = FakeSpoofDetector(fail = true)).playLive() as VerifyStep.Finished).result
+        assertFalse(result.matched)
+        assertEquals(FaceFailure.EngineError, result.failure)
+    }
+
+    @Test
     fun `static photo fails liveness`() {
         val s = session()
         var t = 0L
@@ -115,7 +177,6 @@ class SessionTest {
             EnrollPose.Front to face(),
             EnrollPose.Left to face(yaw = 25f),
             EnrollPose.Right to face(yaw = -25f),
-            EnrollPose.Up to face(pitch = 18f),
         )
         var step: EnrollStep = EnrollStep.Posing(EnrollPose.Front, emptySet(), null, 0f)
         repeat(60) {
@@ -148,6 +209,6 @@ class SessionTest {
         val step = s.onFrame(FakeFrame(clock.next(), listOf(face(yaw = -25f))))
         assertEquals(EnrollPose.Left, (step as EnrollStep.Posing).pose)
         assertEquals(setOf(EnrollPose.Front), step.captured)
-        assertEquals(0.25f, step.progress, 1e-6f)
+        assertEquals("front done is 1 of 3 poses", 1f / 3f, step.progress, 1e-6f)
     }
 }

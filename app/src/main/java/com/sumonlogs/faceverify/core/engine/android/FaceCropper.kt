@@ -9,54 +9,75 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import com.sumonlogs.faceverify.core.engine.FaceAlignment
 import com.sumonlogs.faceverify.core.engine.FaceObservation
+import com.sumonlogs.faceverify.core.engine.FrameGeometry
+import com.sumonlogs.faceverify.core.engine.Similarity
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** Bitmap work for a frame: upright conversion, face alignment and the evidence JPEG. */
+/** Bitmap work for a frame: face alignment, anti-spoof crops and the evidence JPEG. */
 class FaceCropper {
+
+    /**
+     * A camera frame as the sensor delivered it, plus how far it must turn to be upright. Face
+     * coordinates are upright, so crops fold that turn into their own transform and the full frame is
+     * never rotated (only the small evidence JPEG needs an upright copy).
+     */
+    class RawFrame(val bitmap: Bitmap, val rotationDegrees: Int) {
+        val uprightWidth: Int get() = if (rotationDegrees % 180 == 0) bitmap.width else bitmap.height
+        val uprightHeight: Int get() = if (rotationDegrees % 180 == 0) bitmap.height else bitmap.width
+
+        /** Raw pixel coordinates to upright coordinates. */
+        internal val toUpright: Matrix = FrameGeometry.rawToUpright(rotationDegrees, bitmap.width, bitmap.height).toMatrix()
+
+        fun recycle() = bitmap.recycle()
+    }
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
 
-    fun upright(proxy: ImageProxy): Bitmap {
-        val raw = proxy.toBitmap()
-        val rotation = proxy.imageInfo.rotationDegrees
-        if (rotation == 0) return raw
-        val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-        return Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true).also { raw.recycle() }
-    }
+    fun raw(proxy: ImageProxy): RawFrame = RawFrame(proxy.toBitmap(), proxy.imageInfo.rotationDegrees)
 
     /**
      * Aligns the face onto the ArcFace 112×112 template with a least-squares fit over every landmark
      * ML Kit found (eyes, nose, mouth corners), as both models were trained. Falls back to a square
      * box crop when the eyes are missing.
      */
-    fun align(upright: Bitmap, face: FaceObservation, size: Int): IntArray {
-        val matrix = Matrix()
+    fun align(frame: RawFrame, face: FaceObservation, size: Int): IntArray {
         val similarity = FaceAlignment.estimate(face, size)
-        if (similarity != null) {
-            matrix.setValues(
-                floatArrayOf(
-                    similarity.a, -similarity.b, similarity.tx,
-                    similarity.b, similarity.a, similarity.ty,
-                    0f, 0f, 1f,
-                ),
-            )
+        val matrix = if (similarity != null) {
+            similarity.toMatrix()
         } else {
             val side = max(face.width, face.bottom - face.top)
             val s = size / side
-            matrix.setScale(s, s)
-            matrix.preTranslate(-(face.centerX - side / 2f), -(face.centerY - side / 2f))
+            Matrix().apply {
+                setScale(s, s)
+                preTranslate(-(face.centerX - side / 2f), -(face.centerY - side / 2f))
+            }
         }
-        val out = createBitmap(size, size)
-        Canvas(out).drawBitmap(upright, matrix, paint)
-        val pixels = IntArray(size * size)
-        out.getPixels(pixels, 0, size, 0, 0, size, size)
-        out.recycle()
-        return pixels
+        return render(frame, matrix, size)
     }
 
-    fun jpeg(upright: Bitmap, maxSide: Int, quality: Int): ByteArray {
+    /**
+     * The face box enlarged [scale] times around its centre and resized to [size]×[size], as the
+     * anti-spoof models were trained (see [FrameGeometry.enlargedBox]).
+     */
+    fun spoofCrop(frame: RawFrame, face: FaceObservation, scale: Float, size: Int): IntArray {
+        val box = FrameGeometry.enlargedBox(face, scale, frame.uprightWidth, frame.uprightHeight)
+        val matrix = Matrix().apply {
+            setScale(size / box.width, size / box.height)
+            preTranslate(-box.left, -box.top)
+        }
+        return render(frame, matrix, size)
+    }
+
+    /** Evidence photo: the whole frame, upright, downscaled to [maxSide]. */
+    fun jpeg(frame: RawFrame, maxSide: Int, quality: Int): ByteArray {
+        val upright = if (frame.rotationDegrees == 0) {
+            frame.bitmap
+        } else {
+            val turn = Matrix().apply { postRotate(frame.rotationDegrees.toFloat()) }
+            Bitmap.createBitmap(frame.bitmap, 0, 0, frame.bitmap.width, frame.bitmap.height, turn, true)
+        }
         val longest = max(upright.width, upright.height)
         val scaled = if (longest > maxSide) {
             val f = maxSide.toFloat() / longest
@@ -69,6 +90,22 @@ class FaceCropper {
             stream.toByteArray()
         }
         if (scaled !== upright) scaled.recycle()
+        if (upright !== frame.bitmap) upright.recycle()
         return bytes
     }
+
+    /** Draws the raw frame through [uprightToOutput] (upright coordinates to output pixels). */
+    private fun render(frame: RawFrame, uprightToOutput: Matrix, size: Int): IntArray {
+        val matrix = Matrix(uprightToOutput).apply { preConcat(frame.toUpright) }
+        val out = createBitmap(size, size)
+        Canvas(out).drawBitmap(frame.bitmap, matrix, paint)
+        val pixels = IntArray(size * size)
+        out.getPixels(pixels, 0, size, 0, 0, size, size)
+        out.recycle()
+        return pixels
+    }
+}
+
+private fun Similarity.toMatrix(): Matrix = Matrix().apply {
+    setValues(floatArrayOf(a, -b, tx, b, a, ty, 0f, 0f, 1f))
 }

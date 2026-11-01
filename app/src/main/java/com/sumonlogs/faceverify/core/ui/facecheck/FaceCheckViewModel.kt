@@ -9,11 +9,15 @@ import com.sumonlogs.faceverify.core.engine.FaceFrame
 import com.sumonlogs.faceverify.core.engine.FaceRecordStore
 import com.sumonlogs.faceverify.core.engine.LivenessChallenge
 import com.sumonlogs.faceverify.core.engine.QualityIssue
+import com.sumonlogs.faceverify.core.engine.SpoofDetector
 import com.sumonlogs.faceverify.core.engine.VerificationSession
 import com.sumonlogs.faceverify.core.engine.VerifyStep
 import com.sumonlogs.faceverify.core.engine.android.FaceEmbedders
+import com.sumonlogs.faceverify.core.engine.android.FaceWarmUp
 import com.sumonlogs.faceverify.core.mvi.BaseViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 class FaceCheckViewModel(
     private val store: FaceRecordStore,
@@ -21,6 +25,8 @@ class FaceCheckViewModel(
     private val embedders: FaceEmbedders,
     private val config: FaceConfig,
     private val diagnostics: FaceDiagnostics,
+    private val spoofDetector: SpoofDetector,
+    private val warmUp: FaceWarmUp,
 ) : BaseViewModel<FaceCheckIntent, FaceCheckState, FaceCheckEffect>(FaceCheckState()) {
 
     @Volatile
@@ -28,6 +34,10 @@ class FaceCheckViewModel(
 
     @Volatile
     private var done = false
+
+    /** Set once the capture frames are in and the check runs on a worker; later frames are ignored. */
+    @Volatile
+    private var deciding = false
     private var started = false
 
     override fun onIntent(intent: FaceCheckIntent) {
@@ -43,6 +53,8 @@ class FaceCheckViewModel(
     private fun start() {
         if (started) return
         started = true
+        // Models load while the camera starts; the first frames and the final match then don't wait for it.
+        launchSafely { warmUp.run(includeSpoof = true) }
         launchSafely(onError = { finish(FaceMatchResult.failed(FaceFailure.EngineError), FacePrompt.Failed) }) {
             val active = settings.current()
             val people = store.load().filter { it.modelId == active.model.id }
@@ -55,23 +67,24 @@ class FaceCheckViewModel(
                 copy(
                     modelId = active.model.id, threshold = active.threshold,
                     livenessChallenge = challenge.name, livenessPassed = null, bestFaceId = null,
-                    lastScore = null, runnerUpScore = null, lastMatched = null, lastFailure = null, embedMs = null,
+                    lastScore = null, runnerUpScore = null, spoofScore = null, lastMatched = null, lastFailure = null, embedMs = null,
                 )
             }
-            session = VerificationSession(config, active.threshold, challenge, people, embedders.forModel(active.model))
+            session = VerificationSession(config, active.threshold, challenge, people, embedders.forModel(active.model), spoofDetector)
         }
     }
 
     /** Runs on the analysis thread. */
     private fun onFrame(frame: FaceFrame) {
-        if (done) return
+        if (done || deciding) return
         val current = session ?: return
         val step = current.onFrame(frame)
+        current.lastAligned?.let { diagnostics.showAlignedFace(it, ALIGNED_SIZE) }
         val issue = when (step) {
             is VerifyStep.Align -> step.issue
             is VerifyStep.Liveness -> step.issue
             is VerifyStep.Capture -> step.issue
-            is VerifyStep.Finished -> null
+            is VerifyStep.Deciding, is VerifyStep.Finished -> null
         }
         reportDiagnostics(current, issue)
         when (step) {
@@ -88,7 +101,24 @@ class FaceCheckViewModel(
             is VerifyStep.Capture -> setState {
                 copy(step = 3, prompt = step.issue.toPrompt(FacePrompt.HoldStill), ringProgress = 0.7f + 0.25f * step.progress)
             }
+            is VerifyStep.Deciding -> decide(current, step)
             is VerifyStep.Finished -> finish(step.result, step.result.toPrompt())
+        }
+    }
+
+    /**
+     * Runs the slow part (anti-spoofing, embedding, matching) on a worker so the camera thread isn't
+     * blocked, and shows "checking" at once. The crops were copied out of the frames already. If the
+     * screen is left meanwhile, the scope is cancelled and [finish] ignores a late result.
+     */
+    private fun decide(current: VerificationSession, step: VerifyStep.Deciding) {
+        if (deciding) return
+        deciding = true
+        setState { copy(step = totalSteps, prompt = FacePrompt.Checking, ringProgress = CHECKING_PROGRESS) }
+        launchSafely(onError = { finish(FaceMatchResult.failed(FaceFailure.EngineError), FacePrompt.Failed) }) {
+            val result = withContext(Dispatchers.Default) { step.check.run() }
+            reportDiagnostics(current, null)
+            finish(result, result.toPrompt())
         }
     }
 
@@ -130,6 +160,7 @@ class FaceCheckViewModel(
                 yaw = face?.yaw, pitch = face?.pitch, roll = face?.roll,
                 leftEyeOpen = face?.leftEyeOpen, rightEyeOpen = face?.rightEyeOpen,
                 runnerUpScore = session.identification?.runnerUpScore ?: runnerUpScore,
+                spoofScore = session.lastSpoofScore ?: spoofScore,
                 bestFaceId = session.bestFaceId ?: bestFaceId,
                 cropBrightness = session.lastCrop?.brightness ?: cropBrightness,
                 cropSharpness = session.lastCrop?.sharpness ?: cropSharpness,
@@ -166,11 +197,14 @@ class FaceCheckViewModel(
         failure == null -> FacePrompt.Mismatch
         failure == FaceFailure.AmbiguousMatch -> FacePrompt.Ambiguous
         failure == FaceFailure.LivenessFailed -> FacePrompt.LivenessFailed
+        failure == FaceFailure.SpoofSuspected -> FacePrompt.SpoofSuspected
         failure == FaceFailure.NoFace -> FacePrompt.NoFaceFailed
         else -> FacePrompt.Failed
     }
 
     private companion object {
+        const val ALIGNED_SIZE = 112
+        const val CHECKING_PROGRESS = 0.95f
         const val RESULT_HOLD_MS = 900L
         const val FAILURE_HOLD_MS = 1_600L
     }

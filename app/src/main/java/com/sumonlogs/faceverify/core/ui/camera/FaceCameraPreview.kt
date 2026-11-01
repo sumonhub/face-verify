@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.sumonlogs.faceverify.core.api.FaceDiagnostics
 import com.sumonlogs.faceverify.core.engine.FaceConfig
 import com.sumonlogs.faceverify.core.engine.FaceFrame
 import com.sumonlogs.faceverify.core.engine.android.FaceCameraAnalyzer
@@ -39,6 +40,7 @@ fun FaceCameraPreview(
     detector: MlKitFaceDetector = koinInject(),
     cropper: FaceCropper = koinInject(),
     config: FaceConfig = koinInject(),
+    diagnostics: FaceDiagnostics = koinInject(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -60,14 +62,23 @@ fun FaceCameraPreview(
                 ResolutionStrategy(Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER),
             )
             .build()
-        val preview = Preview.Builder().build()
+        val previewResolution = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(
+                ResolutionStrategy(
+                    Size(config.previewWidth, config.previewHeight),
+                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                ),
+            )
+            .build()
+        val preview = Preview.Builder().setResolutionSelector(previewResolution).build()
         val analysis = ImageAnalysis.Builder()
             .setResolutionSelector(resolution)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
         analysis.setAnalyzer(
             executor,
-            FaceCameraAnalyzer(detector, cropper, config, { currentOnFrame(it) }, { currentOnError(it) }),
+            FaceCameraAnalyzer(detector, cropper, config, { currentOnFrame(it) }, { currentOnError(it) }, diagnostics::recordTiming),
         )
         var provider: ProcessCameraProvider? = null
         var disposed = false
