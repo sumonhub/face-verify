@@ -31,6 +31,8 @@ import com.sumonlogs.faceverify.core.ui.components.DarkHeader
 import com.sumonlogs.faceverify.core.ui.components.FaceHeadline
 import com.sumonlogs.faceverify.core.ui.components.FaceOval
 import com.sumonlogs.faceverify.core.ui.components.FaceOvalPlaceholder
+import com.sumonlogs.faceverify.core.ui.components.KeepScreenOn
+import com.sumonlogs.faceverify.core.ui.components.MaxScreenBrightness
 import com.sumonlogs.faceverify.core.ui.components.StepBar
 import com.sumonlogs.faceverify.core.ui.permission.CameraPermissionGate
 import com.sumonlogs.faceverify.core.ui.theme.FaceColors
@@ -55,6 +57,8 @@ fun FaceCheckRoute(
         title = stringResource(R.string.face_check_title),
         onDismiss = { viewModel.onIntent(FaceCheckIntent.PermissionDenied) },
     ) {
+        MaxScreenBrightness()
+        KeepScreenOn()
         LaunchedEffect(Unit) { viewModel.onIntent(FaceCheckIntent.Start) }
         FaceCheckScreen(state = state, onClose = { viewModel.onIntent(FaceCheckIntent.Cancel) }) {
             FaceCameraPreview(

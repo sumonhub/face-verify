@@ -27,6 +27,8 @@ data class FaceConfig(
     val minBrightness: Float = 50f,
     val maxBrightness: Float = 215f,
     val minSharpness: Float = 15f,
+    /** A dark, bright or blurry crop is rejected at once, but the hint only shows after this many frames in a row. */
+    val cropHintAfterFrames: Int = 6,
     /** Minimum time between two frames used for embeddings, so they aren't near-duplicates. */
     val captureSpacingMs: Long = 120L,
 

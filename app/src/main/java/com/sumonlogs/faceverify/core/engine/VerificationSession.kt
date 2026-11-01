@@ -60,6 +60,7 @@ class VerificationSession(
     private var finished: VerifyStep.Finished? = null
     private var deciding: VerifyStep.Deciding? = null
     private val spoofCrops = mutableListOf<SpoofCrops?>()
+    private val cropHint = IssueDebounce(config.cropHintAfterFrames)
 
     var lastFace: FaceObservation? = null
         private set
@@ -143,7 +144,10 @@ class VerificationSession(
 
     private fun capture(frame: FaceFrame): VerifyStep {
         val q = check(frame, requireFront = true)
-        val face = (q as? QualityCheck.Good)?.face ?: return VerifyStep.Capture(lastIssue, captureProgress())
+        val face = (q as? QualityCheck.Good)?.face ?: run {
+            cropHint.reset()
+            return VerifyStep.Capture(lastIssue, captureProgress())
+        }
         if (isDifferentPerson(face)) return restart()
         if (tooSoon(frame.timestampMs)) return VerifyStep.Capture(null, captureProgress())
 
@@ -153,9 +157,10 @@ class VerificationSession(
         val stats = CropQuality.stats(pixels, embedder.inputSize)
         lastCrop = stats
         val cropIssue = CropQuality.issue(stats, config)
+        val shownIssue = cropHint.report(cropIssue)
         if (cropIssue != null) {
             lastIssue = cropIssue
-            return VerifyStep.Capture(cropIssue, captureProgress())
+            return VerifyStep.Capture(shownIssue, captureProgress())
         }
         if (crops.isEmpty()) selfie = frame.selfieJpeg()
         crops += pixels
@@ -256,6 +261,7 @@ class VerificationSession(
         livenessProgress = 0f
         crops.clear()
         spoofCrops.clear()
+        cropHint.reset()
         lastCropAtMs = null
         selfie = null
         return VerifyStep.Align(null)

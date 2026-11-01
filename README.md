@@ -24,7 +24,8 @@ Screenshots: add images under docs/screenshots/ and show them here, for example:
 - **Passive anti-spoofing.** Two MiniFASNet models look at the face and its surroundings to reject
   printed photos and screen replays, even when the challenge was performed.
 - **Quality gating.** Frames are rejected for a small, off-centre or tilted face, closed eyes, and
-  dark, bright or blurry crops, and the user is told why.
+  dark, bright or blurry crops, and the user is told why. Hints appear only when a problem lasts
+  (no flashing on a single dark frame), and the screen stays on at full brightness while capturing.
 - **Private by design.** Only embeddings and names are stored, encrypted with a non-exportable
   Android Keystore key. No face images are kept.
 - **Two languages.** English and Bengali.

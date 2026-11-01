@@ -147,6 +147,19 @@ class SessionTest {
     }
 
     @Test
+    fun `a dark crop is rejected at once but the light hint waits for a lasting problem`() {
+        val s = session()
+        val clock = Clock()
+        repeat(config.stableFrames) { s.onFrame(FakeFrame(clock.next(), listOf(face()))) }
+        listOf(0.95f, 0.05f, 0.95f).forEach { s.onFrame(FakeFrame(clock.next(), listOf(face(eyes = it)))) }
+        val hints = List(config.cropHintAfterFrames + 2) {
+            (s.onFrame(FakeFrame(clock.next(), listOf(face()), gray = 20, contrast = 10)) as VerifyStep.Capture).issue
+        }
+        assertEquals("no flash on the first dark frames", List(config.cropHintAfterFrames - 1) { null }, hints.take(config.cropHintAfterFrames - 1))
+        assertEquals(QualityIssue.TooDark, hints.last())
+    }
+
+    @Test
     fun `static photo fails liveness`() {
         val s = session()
         var t = 0L

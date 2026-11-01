@@ -56,6 +56,7 @@ import com.sumonlogs.faceverify.core.ui.components.FaceIcon
 import com.sumonlogs.faceverify.core.ui.components.FaceOval
 import com.sumonlogs.faceverify.core.ui.components.FaceOvalPlaceholder
 import com.sumonlogs.faceverify.core.ui.components.FacePill
+import com.sumonlogs.faceverify.core.ui.components.KeepScreenOn
 import com.sumonlogs.faceverify.core.ui.components.LivePulseDot
 import com.sumonlogs.faceverify.core.ui.components.MaxScreenBrightness
 import com.sumonlogs.faceverify.core.ui.components.StepBar
@@ -187,6 +188,7 @@ fun FaceEnrollCaptureRoute(
     }
     CameraPermissionGate(title = stringResource(R.string.face_enroll_title), onDismiss = onPermissionDismissed) {
         MaxScreenBrightness()
+        KeepScreenOn()
         LaunchedEffect(Unit) { viewModel.onIntent(EnrollmentCaptureIntent.Start) }
         FaceEnrollCaptureScreen(
             state = state,

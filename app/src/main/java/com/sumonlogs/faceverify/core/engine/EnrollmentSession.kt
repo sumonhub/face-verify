@@ -38,6 +38,7 @@ class EnrollmentSession(
     private var goodFrames = 0
     private var lockedTrackingId: Int? = null
     private var result: EnrollStep? = null
+    private val cropHint = IssueDebounce(config.cropHintAfterFrames)
 
     var lastFace: FaceObservation? = null
         private set
@@ -61,6 +62,7 @@ class EnrollmentSession(
         val face = (q as? QualityCheck.Good)?.face
         if (face == null) {
             goodFrames = 0
+            cropHint.reset()
             return posing((q as? QualityCheck.Bad)?.issue)
         }
         if (isDifferentPerson(face)) return restart()
@@ -80,7 +82,8 @@ class EnrollmentSession(
         val stats = CropQuality.stats(pixels, embedder.inputSize)
         lastCrop = stats
         val issue = CropQuality.issue(stats, config)
-        if (issue != null) return posing(issue)
+        val shownIssue = cropHint.report(issue)
+        if (issue != null) return posing(shownIssue)
         crops += pixels
         lastCropAtMs = frame.timestampMs
         if (crops.size >= config.enrollFrontFrames) done += EnrollPose.Front
@@ -120,6 +123,7 @@ class EnrollmentSession(
     private fun restart(): EnrollStep {
         done.clear()
         crops.clear()
+        cropHint.reset()
         lastCropAtMs = null
         goodFrames = 0
         lockedTrackingId = null
