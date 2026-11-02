@@ -217,7 +217,7 @@ class VerificationSession(
         return when {
             result.matched && best != null -> FaceMatchResult(
                 matched = true,
-                face = EnrolledFace(best.id, best.name, best.enrolledAtMillis, best.modelId),
+                face = EnrolledFace(best.id, best.name, best.enrolledAtMillis, best.modelId, best.pipelineVersion),
                 score = result.score,
                 livenessPassed = true,
                 selfie = evidence,

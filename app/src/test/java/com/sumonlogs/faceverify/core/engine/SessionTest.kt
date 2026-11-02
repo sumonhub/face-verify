@@ -192,7 +192,7 @@ class SessionTest {
             EnrollPose.Right to face(yaw = -25f),
         )
         var step: EnrollStep = EnrollStep.Posing(EnrollPose.Front, emptySet(), null, 0f)
-        repeat(60) {
+        repeat(160) {
             val pose = (step as? EnrollStep.Posing)?.pose ?: return step
             val f = poses.getValue(pose).copy(trackingId = trackingFor(pose))
             step = onFrame(FakeFrame(clock.next(), listOf(f), tagFor(pose)))
@@ -204,6 +204,49 @@ class SessionTest {
     fun `enrollment stores only the front frames`() {
         val step = EnrollmentSession(config, FakeEmbedder()).play()
         assertEquals(config.enrollFrontFrames, (step as EnrollStep.Finished).templates.size)
+    }
+
+    /** Embeds the n-th frame as [vectors][n], so a test decides which frames are outliers. */
+    private class ScriptedEmbedder(private val vectors: List<FloatArray>) : FaceEmbedder {
+        override val model = FaceModels.SFace
+        override val inputSize = FAKE_CROP
+        override fun embed(faces: List<IntArray>): List<FloatArray> = faces.indices.map { vectors[it] }
+    }
+
+    private val same = floatArrayOf(1f, 0f, 0f)
+    private val odd = floatArrayOf(0f, 1f, 0f)
+
+    @Test
+    fun `an outlier enrollment frame is dropped, not fatal`() {
+        val vectors = List(config.enrollFrontFrames) { if (it == 3) odd else same }
+        val step = EnrollmentSession(config, ScriptedEmbedder(vectors)).play()
+        val kept = (step as EnrollStep.Finished).templates
+        assertEquals(config.enrollFrontFrames - 1, kept.size)
+        assertTrue("the odd frame is gone", kept.none { it.contentEquals(odd) })
+    }
+
+    @Test
+    fun `enrollment fails when too few frames agree`() {
+        val agree = config.enrollMinKept - 1
+        val vectors = List(config.enrollFrontFrames) { if (it < agree) same else if (it % 2 == 0) odd else floatArrayOf(0f, 0f, 1f) }
+        val step = EnrollmentSession(config, ScriptedEmbedder(vectors)).play()
+        assertEquals(EnrollFailure.Inconsistent, (step as EnrollStep.Failed).reason)
+    }
+
+    @Test
+    fun `enrollment frames are spread out over time`() {
+        val s = EnrollmentSession(config, FakeEmbedder())
+        // Frames every 66 ms: only one in about five may be used, so 8 frames take about 2.5 s.
+        var framesUsed = 0
+        var t = 0L
+        var lastFrames = 0f
+        repeat(10) {
+            val step = s.onFrame(FakeFrame(t, listOf(face()))) as EnrollStep.Posing
+            if (step.progress > lastFrames) framesUsed++
+            lastFrames = step.progress
+            t += 66
+        }
+        assertTrue("took $framesUsed of 10 frames in 660 ms", framesUsed <= 2)
     }
 
     @Test
@@ -218,7 +261,7 @@ class SessionTest {
     fun `enrollment waits while pose is wrong`() {
         val s = EnrollmentSession(config, FakeEmbedder())
         val clock = Clock()
-        repeat(20) { s.onFrame(FakeFrame(clock.next(), listOf(face()))) }
+        repeat(80) { s.onFrame(FakeFrame(clock.next(), listOf(face()))) }
         val step = s.onFrame(FakeFrame(clock.next(), listOf(face(yaw = -25f))))
         assertEquals(EnrollPose.Left, (step as EnrollStep.Posing).pose)
         assertEquals(setOf(EnrollPose.Front), step.captured)

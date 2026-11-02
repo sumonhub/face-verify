@@ -2,6 +2,7 @@ package com.sumonlogs.faceverify.core.engine
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,6 +24,28 @@ class FaceRecordCodecTest {
         assertEquals("mobilefacenet", decoded[1].modelId)
         assertArrayEquals(records[0].templates[1], decoded[0].templates[1], 0f)
         assertArrayEquals(records[1].templates[0], decoded[1].templates[0], 0f)
+    }
+
+    @Test
+    fun `the pipeline version round trips and old blobs read as pipeline 1`() {
+        val current = FaceRecord("a", "Alex", 1L, "sface-2021dec", listOf(floatArrayOf(1f, 2f)))
+        assertEquals(FaceTemplates.PIPELINE_VERSION, FaceRecordCodec.decode(FaceRecordCodec.encode(listOf(current)))!![0].pipelineVersion)
+
+        val old = FaceRecord("b", "Sam", 2L, "sface-2021dec", listOf(floatArrayOf(3f)), pipelineVersion = 7)
+        assertEquals(7, FaceRecordCodec.decode(FaceRecordCodec.encode(listOf(old)))!![0].pipelineVersion)
+
+        // A version 3 blob, written the way the app did before the pipeline version existed.
+        val bytes = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(bytes).use { out ->
+            out.writeByte(3); out.writeInt(1)
+            out.writeUTF("c"); out.writeUTF("Old"); out.writeLong(3L); out.writeUTF("sface-2021dec")
+            out.writeInt(1); out.writeInt(2); out.writeFloat(1f); out.writeFloat(2f)
+        }
+        val legacy = FaceRecordCodec.decode(bytes.toByteArray())!!
+        assertEquals(1, legacy[0].pipelineVersion)
+        assertFalse("an older pipeline's person is not matched", legacy[0].isUsableWith("sface-2021dec"))
+        assertTrue(current.isUsableWith("sface-2021dec"))
+        assertFalse(current.isUsableWith("mobilefacenet"))
     }
 
     @Test

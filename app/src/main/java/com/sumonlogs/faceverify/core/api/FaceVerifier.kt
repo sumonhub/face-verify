@@ -1,5 +1,6 @@
 package com.sumonlogs.faceverify.core.api
 
+import com.sumonlogs.faceverify.core.engine.FaceTemplates
 import kotlinx.coroutines.flow.Flow
 
 /** The face feature's public API. Every method is safe to call; verify() never throws. */
@@ -16,7 +17,18 @@ interface FaceVerifier {
     suspend fun deleteEnrollment(id: String)
 }
 
-data class EnrolledFace(val id: String, val name: String, val enrolledAtMillis: Long, val modelId: String)
+data class EnrolledFace(
+    val id: String,
+    val name: String,
+    val enrolledAtMillis: Long,
+    val modelId: String,
+    /** The face pipeline that made the template; see [FaceTemplates]. Defaults to the current one. */
+    val pipelineVersion: Int = FaceTemplates.PIPELINE_VERSION,
+) {
+    /** Only a template of the active model made by the current pipeline can be matched. */
+    fun isUsableWith(activeModelId: String?): Boolean =
+        modelId == activeModelId && pipelineVersion == FaceTemplates.PIPELINE_VERSION
+}
 
 enum class FaceFailure {
     NoFace,

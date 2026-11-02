@@ -58,7 +58,7 @@ class FaceCheckViewModel(
         launchSafely { warmUp.run(includeSpoof = true) }
         launchSafely(onError = { finish(FaceMatchResult.failed(FaceFailure.EngineError), FacePrompt.Failed) }) {
             val active = settings.current()
-            val people = store.load().filter { it.modelId == active.model.id }
+            val people = store.load().filter { it.isUsableWith(active.model.id) }
             if (people.isEmpty()) {
                 finish(FaceMatchResult.failed(FaceFailure.NotEnrolled), null)
                 return@launchSafely
@@ -196,6 +196,7 @@ class FaceCheckViewModel(
         QualityIssue.TooDark -> FacePrompt.TooDark
         QualityIssue.TooBright -> FacePrompt.TooBright
         QualityIssue.Blurry -> FacePrompt.Blurry
+        QualityIssue.BadLighting -> FacePrompt.BadLighting
         QualityIssue.FaceChanged -> fallback
     }
 

@@ -30,6 +30,8 @@ Screenshots: add images under docs/screenshots/ and show them here, for example:
   Android Keystore key. No face images are kept.
 - **Two languages.** English and Bengali.
 - **A test app.** Switch models, tune the threshold, label checks to calibrate, and watch live timings.
+- **Tester data collection (opt-in).** The test app can send anonymous numbers from each check to Firebase,
+  with scripts that turn them into thresholds. See [Collecting tester data](#collecting-tester-data).
 
 ## How a face check works
 
@@ -45,11 +47,17 @@ flowchart LR
     H --> I{Threshold<br/>+ margin}
 ```
 
-1. **Enrollment** captures 5 front-facing frames and stores their embeddings. Turning left and right
-   is a liveness check only, and those frames are not stored. The same tracked face must stay in
-   view throughout, and a face that is already enrolled is refused.
-2. **Alignment.** Each crop is aligned with a least-squares fit on 5 landmarks (eyes, nose, mouth
-   corners) to the ArcFace 112×112 template.
+1. **Enrollment** captures 8 front-facing frames, at least 350 ms apart so they cover natural movement,
+   and stores their embeddings. A frame that disagrees with the group (a blink, a blur) is dropped, and
+   enrollment fails only if fewer than 5 agree. Turning left and right is a liveness check only, and
+   those frames are not stored. The same tracked face must stay in view throughout, and a face that is
+   already enrolled is refused.
+2. **Alignment.** ML Kit runs in its accurate mode. Each crop is aligned with a least-squares fit on 4
+   landmarks (eyes and mouth corners) to the ArcFace 112×112 template. The nose is left out: ML Kit
+   reports the nose base, the template holds the nose tip. Crops with flat or one-sided lighting are
+   asked to be retaken, besides the dark, bright and blurry checks.
+   Every template carries a pipeline version; when the pipeline changes, people enrolled under the old
+   one are listed as "enroll again" instead of silently scoring lower.
 3. **Verification** averages the embeddings of 3 front frames after the liveness challenge and
    compares them with the average of each person's templates.
 4. **Decision.** The best person must reach the model's threshold *and* beat the runner-up by
@@ -81,6 +89,7 @@ the active model's people are matched. Sources, hashes and licence texts are in 
 | ML runtime | LiteRT 1.4 (TensorFlow Lite) on CPU, ML Kit face detection 16.1 |
 | Architecture | MVI view models, Koin dependency injection, a pure Kotlin engine with no Android types |
 | Storage | DataStore + AES-256-GCM with an Android Keystore key |
+| Tester data (test app only) | Firebase Firestore and Crashlytics, opt-in and anonymous |
 | Build | AGP 9.4, R8 in release, baseline profile, `minSdk 27` |
 
 ## Architecture
@@ -95,7 +104,12 @@ app/src/main/java/com/sumonlogs/faceverify/
 │   ├── di/       Koin module (load faceModule to use the feature)
 │   └── mvi/      small MVI base
 ├── harness/      test app: model switch, threshold, calibration, performance, debug panel
+│   └── telemetry/ opt-in tester data: consent, check records, Firestore uploader
 └── MainActivity.kt
+
+firestore.rules       database rules for the tester data
+docs/                 Firebase setup and tester guide
+tools/                export and analysis scripts for the collected data
 ```
 
 The engine takes plain numbers and arrays, so sessions, matching and quality checks are covered by
@@ -105,16 +119,19 @@ JVM unit tests without a device. Camera frames are wrapped behind a small `FaceF
 
 - Names and embeddings are encrypted at rest (AES-256-GCM, non-exportable Keystore key). No face
   images are stored. The selfie of a check is only returned to the caller and is never written to disk.
-- The app contains no networking code, and no face data is sent anywhere. Some Google libraries
-  declare the `INTERNET` permission in the merged manifest; remove it with a manifest merge rule if
-  you need to enforce an offline app.
+- The face feature (`core/`) contains no networking code and sends no face data anywhere. Only the test
+  app can send data, and only after the tester taps Agree: anonymous numbers (scores, timings, light, phone
+  model) and crash reports, never photos, names or embeddings. It is off by default and hidden entirely in a
+  build without a Firebase config. Some Google libraries also declare the `INTERNET` permission in the merged
+  manifest.
 - Backup is disabled for the template store, because the Keystore key can't be restored.
 
 ## Performance and size
 
 - Release builds use R8 and ship a baseline profile. Models are loaded and warmed up in the background
   when the enrollment or camera screen opens.
-- A release APK with `arm64-v8a` and `armeabi-v7a` is about **65 MB** (models are about 41 MB of that).
+- A release APK with `arm64-v8a` and `armeabi-v7a` is about **65 MB** (models are about 41 MB of that), including
+  the Firebase libraries of the test app.
 - The test app has a **Performance** card with per-stage average and p95 timings (detection, frame
   conversion, alignment, each anti-spoof model, embedding) and a thread benchmark. Use a release build
   to read it. Per-device numbers are not published yet.
@@ -133,11 +150,35 @@ Requires Android Studio with a recent Android SDK, JDK 17 and a phone or emulato
 
 The launcher activity is the test app: enroll a person, run a check, and read the debug panel.
 
+## Collecting tester data
+
+To improve the thresholds with real people and phones, share the APK with a tester group and let the test app
+report back:
+
+1. Each tester agrees to share anonymous data, then sets **Test setup** (who is in front of the camera, light,
+   glasses) so every check is saved with the right answer.
+2. Each check uploads one record to Firestore: scores, anti-spoof score, timings, light numbers, phone model.
+   Offline records wait and send later. Crashes go to Crashlytics.
+3. `tools/export_checks.py` downloads the records and `tools/analyze_checks.py` prints false accepts and
+   rejects at every threshold, the anti-spoof cut-off, brightness by lighting, and speed per phone.
+4. Optionally, testers can also switch on **Face images** (off by default, its own confirmation): the aligned
+   112×112 crop of checks where they were the enrolled person goes to a `crops` collection, and
+   `tools/export_crops.py` turns it into the folder `face_eval.py` reads.
+5. `tools/face_eval.py` is the offline benchmark: give it a folder of aligned 112×112 crops
+   (`employee/session/image`) and it runs every model on the same crops, then reports ROC, EER, TAR at a
+   chosen FAR, score distributions and open-set identification, with the threshold picked on one half of the
+   employees and judged on the other half. It also compares centroid, max and mean template scoring.
+   `tools/align_photos.py` aligns ordinary photos first (MediaPipe landmarks, offline only). See
+   `docs/face-evaluation.md`.
+
+Setup steps, signing and a tester checklist are in [`docs/firebase-setup.md`](docs/firebase-setup.md). The
+database rules are in [`firestore.rules`](firestore.rules); a unit test keeps them in step with what the app sends.
+
 ## Calibrating the threshold
 
-Starting thresholds are guesses (SFace 0.42, MobileFaceNet 0.65), and the anti-spoof cut-off
-(`spoofMinScore`, 0.5) is the model's own decision point. In the test app, label every check with who
-was really in front of the camera; the calibration card shows how many strangers got in and how many
+Starting thresholds are guesses (both models start at a strict 0.75; SFace's own reference is 0.363), and the anti-spoof cut-off
+(`spoofMinScore`, 0.5) is the model's own decision point. For one person on one phone, label every check in
+the test app with who was really in front of the camera; the calibration card shows how many strangers got in and how many
 right people were refused at the current threshold, and suggests one. Test with several people,
 different light, glasses on and off, and people who look alike.
 
@@ -154,6 +195,8 @@ different light, glasses on and off, and people who look alike.
 | Dependencies | CameraX 1.4.2 (core, camera2, lifecycle, view), `com.google.mlkit:face-detection:16.1.7`, `com.google.ai.edge.litert:litert:1.4.1` |
 | Release | the R8 rules in `src/main/keepRules/rules.keep` (LiteRT must be kept) |
 
+The `harness/` package and the Firebase dependencies belong to the test app; leave them out when reusing the feature.
+
 Then load `faceModule` in Koin.
 
 ### Public API
@@ -168,11 +211,13 @@ Then load `faceModule` in Koin.
 ## Status and roadmap
 
 Working today: enrollment, 1:N identification, active liveness, two-model anti-spoofing, encrypted
-storage, quality gating, a calibration test app, and release optimisation.
+storage, quality gating, a calibration test app, release optimisation, and an opt-in tester data pipeline.
 
 Next, in order:
-1. An offline tool to measure false accepts and rejects per model and pick evidence-based thresholds.
-2. Accuracy work: alignment checks against ML Kit's landmark conventions, stricter quality gates.
+1. Run the tester group (Firebase pipeline above) and use `tools/analyze_checks.py` to pick evidence-based
+   thresholds for each model and the anti-spoof cut-off.
+2. Accuracy work, partly done (accurate mode, no nose, enrollment, lighting gates, template version): measure
+   it with the tester data, then decide on a stronger landmark source.
 3. UX: overlap capture with the challenge, direction arrows and a countdown on the check screen,
    retry advice after a failure, accessibility.
 4. Experiments: a cheaper anti-spoof cascade and a quantized embedding model, kept only if accuracy

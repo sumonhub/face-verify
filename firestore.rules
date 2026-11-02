@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// Paste this into Firebase console > Firestore Database > Rules, then Publish.
+//
+// Testers' phones may add check records and nothing else: no reading, changing or deleting from a
+// phone. Read the data with the export script in tools/ (it uses a service account, which is not
+// subject to these rules). The allowed field names must match CheckRecord.toFields() in the app; a
+// unit test checks that.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /checks/{checkId} {
+      allow create: if request.resource.data.schema == 1
+        && request.resource.data.keys().hasOnly([
+          'schema', 'installId', 'appVersion', 'device', 'sdk', 'pipelineVersion', 'takenAtMillis',
+          'receivedAt', 'modelId', 'threshold', 'scenario', 'lighting', 'glasses', 'faceCovered',
+          'expectedFaceId', 'matchedFaceId', 'enrolledCount', 'matched', 'failure', 'score',
+          'runnerUp', 'spoofScore', 'challenge', 'livenessPassed', 'faceBrightness',
+          'faceSharpness', 'qualityIssue', 'detectMs', 'embedMs', 'totalMs',
+          'timingAvgMs', 'timingP95Ms'
+        ])
+        && request.resource.data.keys().hasAll([
+          'schema', 'installId', 'appVersion', 'device', 'takenAtMillis', 'receivedAt',
+          'scenario', 'matched', 'score'
+        ])
+        && request.resource.data.installId is string
+        && request.resource.data.installId.size() <= 64
+        && request.resource.data.device is string
+        && request.resource.data.device.size() <= 100
+        && request.resource.data.matched is bool
+        && request.resource.data.score is number
+        && request.resource.data.receivedAt == request.time;
+
+      allow read, update, delete: if false;
+    }
+
+    // Aligned 112x112 face crops, sent only by testers who switched on "Face images". Same rule: create
+    // only. The field list must match CropRecord.toFields() (a test checks that).
+    match /crops/{cropId} {
+      allow create: if request.resource.data.schema == 1
+        && request.resource.data.keys().hasOnly([
+          'schema', 'installId', 'appVersion', 'device', 'pipelineVersion', 'takenAtMillis', 'receivedAt',
+          'person', 'session', 'lighting', 'glasses', 'faceCovered', 'matched', 'score', 'png'
+        ])
+        && request.resource.data.keys().hasAll([
+          'schema', 'installId', 'appVersion', 'device', 'takenAtMillis', 'receivedAt', 'person',
+          'session', 'matched', 'score', 'png'
+        ])
+        && request.resource.data.installId is string
+        && request.resource.data.installId.size() <= 64
+        && request.resource.data.person is string
+        && request.resource.data.person.size() <= 40
+        && request.resource.data.session is string
+        && request.resource.data.session.size() <= 60
+        && request.resource.data.matched is bool
+        && request.resource.data.score is number
+        && request.resource.data.png is string
+        && request.resource.data.png.size() <= 150000
+        && request.resource.data.receivedAt == request.time;
+
+      allow read, update, delete: if false;
+    }
+  }
+}

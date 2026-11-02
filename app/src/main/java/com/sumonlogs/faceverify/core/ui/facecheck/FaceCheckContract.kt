@@ -20,7 +20,7 @@ sealed interface FaceCheckIntent : UiIntent {
 /** What the headline and sub-line say. Each maps to a string pair in the screen. */
 enum class FacePrompt {
     Look, NoFace, MultipleFaces, TooFar, TooClose, NotCentred, TurnedAway, Tilted, EyesClosed,
-    TooDark, TooBright, Blurry,
+    TooDark, TooBright, Blurry, BadLighting,
     Blink, TurnLeft, TurnRight,
     HoldStill, Checking,
     Matched, Mismatch, Ambiguous, LivenessFailed, SpoofSuspected, NoFaceFailed, Failed, CameraUnavailable,

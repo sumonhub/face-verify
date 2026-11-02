@@ -39,7 +39,7 @@ class FaceCropper {
 
     /**
      * Aligns the face onto the ArcFace 112×112 template with a least-squares fit over every landmark
-     * ML Kit found (eyes, nose, mouth corners), as both models were trained. Falls back to a square
+     * ML Kit found (eyes and mouth corners), as both models were trained. Falls back to a square
      * box crop when the eyes are missing.
      */
     fun align(frame: RawFrame, face: FaceObservation, size: Int): IntArray {

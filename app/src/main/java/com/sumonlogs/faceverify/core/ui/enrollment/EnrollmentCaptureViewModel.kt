@@ -115,7 +115,7 @@ class EnrollmentCaptureViewModel(
             val model = active ?: settings.current()
             val probe = FaceMatcher.centroid(templates)
             val clash = store.load()
-                .filter { it.modelId == model.model.id }
+                .filter { it.isUsableWith(model.model.id) }
                 .map { it to FaceMatcher.score(probe, it.templates) }
                 .filter { (_, score) -> score >= model.threshold }
                 .maxByOrNull { (_, score) -> score }
@@ -133,7 +133,9 @@ class EnrollmentCaptureViewModel(
             )
             store.add(record)
             sendEffect(
-                EnrollmentCaptureEffect.Enrolled(EnrolledFace(record.id, record.name, record.enrolledAtMillis, record.modelId)),
+                EnrollmentCaptureEffect.Enrolled(
+                    EnrolledFace(record.id, record.name, record.enrolledAtMillis, record.modelId, record.pipelineVersion),
+                ),
             )
         }
     }

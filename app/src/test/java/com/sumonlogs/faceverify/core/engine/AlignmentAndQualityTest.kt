@@ -33,6 +33,25 @@ class AlignmentAndQualityTest {
     }
 
     @Test
+    fun `the nose is not part of the fit`() {
+        // ML Kit reports the nose base, the template holds the nose tip: they must not be fitted to each other.
+        val base = face().copy(rightEye = Point(200f, 300f), leftEye = Point(280f, 300f),
+            mouthRight = Point(210f, 380f), mouthLeft = Point(270f, 380f))
+        val a = requireNotNull(FaceAlignment.estimate(base.copy(noseBase = Point(240f, 340f)), 112))
+        val b = requireNotNull(FaceAlignment.estimate(base.copy(noseBase = Point(250f, 365f)), 112))
+        assertEquals(a, b)
+    }
+
+    @Test
+    fun `mouth corners steer the fit`() {
+        val eyes = face().copy(rightEye = Point(200f, 300f), leftEye = Point(280f, 300f))
+        val withMouth = eyes.copy(mouthRight = Point(210f, 380f), mouthLeft = Point(270f, 380f))
+        val fit = requireNotNull(FaceAlignment.estimate(withMouth, 112))
+        assertEquals(41.55f, fit.apply(Point(210f, 380f)).x, 1.5f)
+        assertEquals(92.3f, fit.apply(Point(210f, 380f)).y, 1.5f)
+    }
+
+    @Test
     fun `no alignment without both eyes`() {
         assertNull(FaceAlignment.estimate(face().copy(leftEye = null), 112))
     }
@@ -46,5 +65,31 @@ class AlignmentAndQualityTest {
         assertNull("a dim but usable face is not turned away", issue(40, 40))
         assertEquals(QualityIssue.TooBright, issue(240, 10))
         assertEquals(QualityIssue.Blurry, issue(130, 0))
+    }
+
+    /** A crop that is dark on the left half and bright on the right, with texture so it is not "flat". */
+    private fun sideLit(left: Int, right: Int): IntArray = IntArray(FAKE_CROP * FAKE_CROP) { i ->
+        val x = i % FAKE_CROP
+        val base = if (x < FAKE_CROP / 2) left else right
+        val v = if ((i / FAKE_CROP + x) % 2 == 0) base + 40 else base - 40
+        (v shl 16) or (v shl 8) or v
+    }
+
+    @Test
+    fun `strongly one-sided light is turned away, mild shading is not`() {
+        val config = FaceConfig()
+        fun issue(left: Int, right: Int) = CropQuality.issue(CropQuality.stats(sideLit(left, right), FAKE_CROP), config)
+        assertNull("even light", issue(130, 130))
+        assertNull("mild shading is normal indoors", issue(115, 145))
+        assertEquals(QualityIssue.BadLighting, issue(70, 190))
+    }
+
+    @Test
+    fun `a washed out crop with some texture but little contrast is flagged`() {
+        val config = FaceConfig()
+        val stats = CropQuality.stats(fakeCrop(0, gray = 130, contrast = 12), FAKE_CROP)
+        assertEquals(12f, stats.contrast, 0.5f)
+        // Sharp enough to pass the blur check at this contrast only if the Laplacian is large; force it.
+        assertEquals(QualityIssue.BadLighting, CropQuality.issue(stats.copy(sharpness = 100f), config))
     }
 }

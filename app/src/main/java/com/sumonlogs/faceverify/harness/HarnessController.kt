@@ -7,6 +7,8 @@ import com.sumonlogs.faceverify.core.api.FaceFailure
 import com.sumonlogs.faceverify.core.api.FaceMatchResult
 import com.sumonlogs.faceverify.core.api.FaceModelSettings
 import com.sumonlogs.faceverify.core.api.FaceVerifier
+import com.sumonlogs.faceverify.harness.telemetry.TesterSetup
+import com.sumonlogs.faceverify.harness.telemetry.TesterTelemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +40,9 @@ data class LastCheck(
             result.livenessPassed && (result.failure == null || result.failure == FaceFailure.AmbiguousMatch)
 }
 
+/** Results that say nothing about the face: the tester backed out, or there was nobody to check. */
+private val NOT_A_CHECK = setOf(FaceFailure.Cancelled, FaceFailure.PermissionDenied, FaceFailure.NotEnrolled)
+
 /** Plain harness state holder: runs FaceVerifier calls, model settings and calibration. */
 class HarnessController(
     private val verifier: FaceVerifier,
@@ -45,6 +50,7 @@ class HarnessController(
     private val diagnostics: FaceDiagnostics,
     private val calibration: CalibrationLog,
     private val benchmark: PerformanceBenchmark,
+    private val telemetry: TesterTelemetry,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -64,6 +70,20 @@ class HarnessController(
         diagnostics.captureAlignedFace = true
     }
 
+    // Tester data sharing (see harness/telemetry)
+    val setup = telemetry.setup
+    val consent = telemetry.consent
+    val uploads = telemetry.uploads
+    val installId = telemetry.installId
+    val cropConsent = telemetry.cropConsent
+    val sharingAvailable: Boolean get() = telemetry.available
+
+    fun setCropConsent(granted: Boolean) = telemetry.setCropConsent(granted)
+
+    fun updateSetup(setup: TesterSetup) = telemetry.updateSetup(setup)
+
+    fun setConsent(granted: Boolean) = telemetry.setConsent(granted)
+
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
@@ -78,6 +98,10 @@ class HarnessController(
                 val result = verifier.verify()
                 val info = diagnostics.info.value
                 _lastCheck.value = LastCheck(result, info.modelId, info.bestFaceId, info.lastScore ?: result.score)
+                if (result.failure !in NOT_A_CHECK) {
+                    val usable = faces.value.orEmpty().filter { it.isUsableWith(info.modelId) }
+                    telemetry.record(result, info, diagnostics.stageTimings.value, usable, diagnostics.alignedFace.value)
+                }
             } finally {
                 _busy.value = false
             }

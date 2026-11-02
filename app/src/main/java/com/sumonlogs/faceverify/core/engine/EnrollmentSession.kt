@@ -15,7 +15,7 @@ sealed interface EnrollStep {
         val progress: Float,
     ) : EnrollStep
 
-    /** The front-facing embeddings that make up the new person's template. */
+    /** The front-facing embeddings that make up the new person's template (outlier frames already dropped). */
     data class Finished(val templates: List<FloatArray>) : EnrollStep
 
     data class Failed(val reason: EnrollFailure) : EnrollStep
@@ -103,10 +103,12 @@ class EnrollmentSession(
         } catch (e: Exception) {
             return fail(EnrollFailure.EngineError)
         }
+        // One bad frame (a blink, a blur) must not spoil the template, and must not fail the whole
+        // enrollment either: drop what disagrees with the group and keep the rest.
         val centre = FaceMatcher.centroid(embeddings)
-        val consistent = embeddings.all { FaceMatcher.cosine(centre, it) >= config.enrollConsistencyMin }
-        if (!consistent) return fail(EnrollFailure.Inconsistent)
-        return EnrollStep.Finished(embeddings).also { result = it }
+        val kept = embeddings.filter { FaceMatcher.cosine(centre, it) >= config.enrollConsistencyMin }
+        if (kept.size < config.enrollMinKept) return fail(EnrollFailure.Inconsistent)
+        return EnrollStep.Finished(kept).also { result = it }
     }
 
     private fun posing(issue: QualityIssue?): EnrollStep.Posing {
@@ -144,9 +146,9 @@ class EnrollmentSession(
         EnrollPose.Right -> face.yaw <= -config.enrollTurnYawDeg && abs(face.pitch) <= config.maxFrontPitchDeg * 1.5f
     }
 
-    /** Frames used for embeddings must be [FaceConfig.captureSpacingMs] apart, so they aren't near-duplicates. */
+    /** Frames used for embeddings must be [FaceConfig.enrollSpacingMs] apart, so they aren't near-duplicates. */
     private fun tooSoon(timestampMs: Long): Boolean {
         val last = lastCropAtMs ?: return false
-        return timestampMs - last < config.captureSpacingMs
+        return timestampMs - last < config.enrollSpacingMs
     }
 }

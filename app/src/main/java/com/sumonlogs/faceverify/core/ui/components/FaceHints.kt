@@ -18,5 +18,6 @@ fun QualityIssue.hintRes(): Int = when (this) {
     QualityIssue.TooDark -> R.string.face_hint_too_dark
     QualityIssue.TooBright -> R.string.face_hint_too_bright
     QualityIssue.Blurry -> R.string.face_hint_blurry
+    QualityIssue.BadLighting -> R.string.face_hint_bad_lighting
     QualityIssue.FaceChanged -> R.string.face_hint_face_changed
 }

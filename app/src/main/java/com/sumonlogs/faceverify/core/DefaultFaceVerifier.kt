@@ -24,12 +24,12 @@ class DefaultFaceVerifier(
 ) : FaceVerifier {
 
     override val enrolledFaces: Flow<List<EnrolledFace>> = store.records
-        .map { records -> records.map { EnrolledFace(it.id, it.name, it.enrolledAtMillis, it.modelId) } }
+        .map { records -> records.map { EnrolledFace(it.id, it.name, it.enrolledAtMillis, it.modelId, it.pipelineVersion) } }
         .catch { emit(emptyList()) }
 
     override suspend fun verify(): FaceMatchResult = try {
         val modelId = settings.current().model.id
-        if (store.load().none { it.modelId == modelId }) {
+        if (store.load().none { it.isUsableWith(modelId) }) {
             FaceMatchResult.failed(FaceFailure.NotEnrolled).also { report(it) }
         } else {
             broker.run { launchFaceCheck() }

@@ -56,6 +56,11 @@ import com.sumonlogs.faceverify.core.ui.components.FaceGlyph
 import com.sumonlogs.faceverify.core.ui.components.FaceIcon
 import com.sumonlogs.faceverify.core.ui.theme.FaceColors
 import com.sumonlogs.faceverify.core.ui.theme.FaceTypography
+import com.sumonlogs.faceverify.harness.telemetry.ConsentState
+import com.sumonlogs.faceverify.harness.telemetry.Lighting
+import com.sumonlogs.faceverify.harness.telemetry.TestScenario
+import com.sumonlogs.faceverify.harness.telemetry.TesterSetup
+import com.sumonlogs.faceverify.harness.telemetry.UploadStats
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,10 +80,17 @@ fun HomeRoute(
     val timings by diagnostics.stageTimings.collectAsStateWithLifecycle()
     val aligned by diagnostics.alignedFace.collectAsStateWithLifecycle()
     val bench by controller.bench.collectAsStateWithLifecycle()
+    val setup by controller.setup.collectAsStateWithLifecycle()
+    val consent by controller.consent.collectAsStateWithLifecycle()
+    val uploads by controller.uploads.collectAsStateWithLifecycle()
+    val installId by controller.installId.collectAsStateWithLifecycle()
+    val cropConsent by controller.cropConsent.collectAsStateWithLifecycle()
     HomeScreen(
         HomeUi(
             faces = faces, active = active, busy = busy, lastCheck = lastCheck, stats = stats, debug = debug,
             timings = timings, aligned = aligned, bench = bench,
+            sharingAvailable = controller.sharingAvailable, consent = consent, setup = setup,
+            uploads = uploads, installId = installId, cropConsent = cropConsent,
         ),
         HomeActions(
             onEnroll = onEnroll,
@@ -90,6 +102,9 @@ fun HomeRoute(
             onClearCalibration = controller::clearCalibration,
             onBenchmark = controller::runBenchmark,
             onClearTimings = controller::clearTimings,
+            onSetup = controller::updateSetup,
+            onConsent = controller::setConsent,
+            onCropConsent = controller::setCropConsent,
         ),
     )
 }
@@ -104,6 +119,14 @@ data class HomeUi(
     val timings: List<StageTiming> = emptyList(),
     val aligned: AlignedPreview? = null,
     val bench: BenchState = BenchState.Idle,
+    /** False when this build has no Firebase project: all the data-sharing UI is hidden. */
+    val sharingAvailable: Boolean = false,
+    val consent: ConsentState = ConsentState.Loading,
+    val setup: TesterSetup = TesterSetup(),
+    val uploads: UploadStats = UploadStats(),
+    val installId: String? = null,
+    /** Separate from [consent]: sending aligned face images, off until the tester turns it on. */
+    val cropConsent: ConsentState = ConsentState.Declined,
 )
 
 class HomeActions(
@@ -117,13 +140,16 @@ class HomeActions(
     val onClearCalibration: () -> Unit,
     val onBenchmark: () -> Unit = {},
     val onClearTimings: () -> Unit = {},
+    val onSetup: (TesterSetup) -> Unit = {},
+    val onConsent: (Boolean) -> Unit = {},
+    val onCropConsent: (Boolean) -> Unit = {},
 )
 
 @Composable
 fun HomeScreen(ui: HomeUi, actions: HomeActions) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val activeId = ui.active?.model?.id
-    val usable = ui.faces.orEmpty().filter { it.modelId == activeId }
+    val usable = ui.faces.orEmpty().filter { it.isUsableWith(activeId) }
 
     Column(
         Modifier
@@ -136,6 +162,10 @@ fun HomeScreen(ui: HomeUi, actions: HomeActions) {
     ) {
         Text(stringResource(R.string.app_name), style = FaceTypography.ScreenTitle, color = FaceColors.TextPrimary)
         if (ui.active != null) ModelCard(ui.active, actions)
+        if (ui.sharingAvailable) {
+            TestSetupCard(ui.setup, usable, actions)
+            SharingCard(ui, actions)
+        }
         FaceButton(stringResource(R.string.harness_enroll), actions.onEnroll, glyph = FaceGlyph.Person)
         FaceButton(
             stringResource(if (ui.busy) R.string.harness_verifying else R.string.harness_verify),
@@ -147,6 +177,20 @@ fun HomeScreen(ui: HomeUi, actions: HomeActions) {
         EnrolledList(ui.faces, activeId, onDeleteRequest = { pendingDeleteId = it.id })
         PerformanceCard(ui, actions)
         DebugPanel(ui.lastCheck?.result, ui.debug, ui.aligned)
+    }
+
+    if (ui.sharingAvailable && ui.consent == ConsentState.NotAsked) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(R.string.harness_consent_title), style = FaceTypography.CardTitle) },
+            text = { Text(stringResource(R.string.harness_consent_body), style = FaceTypography.Body) },
+            confirmButton = {
+                TextButton({ actions.onConsent(true) }) { Text(stringResource(R.string.harness_consent_agree), style = FaceTypography.BodySemiBold) }
+            },
+            dismissButton = {
+                TextButton({ actions.onConsent(false) }) { Text(stringResource(R.string.harness_consent_decline), style = FaceTypography.BodySemiBold) }
+            },
+        )
     }
 
     val pending = ui.faces?.firstOrNull { it.id == pendingDeleteId }
@@ -280,13 +324,15 @@ private fun EnrolledList(faces: List<EnrolledFace>?, activeModelId: String?, onD
         when {
             faces == null -> Text(stringResource(R.string.harness_loading), style = FaceTypography.Body, color = FaceColors.TextMuted)
             faces.isEmpty() -> Text(stringResource(R.string.harness_enrolled_empty), style = FaceTypography.Body, color = FaceColors.TextMuted)
-            else -> faces.forEach { face -> EnrolledRow(face, usable = face.modelId == activeModelId, onDeleteRequest) }
+            else -> faces.forEach { face ->
+                EnrolledRow(face, usable = face.isUsableWith(activeModelId), sameModel = face.modelId == activeModelId, onDeleteRequest)
+            }
         }
     }
 }
 
 @Composable
-private fun EnrolledRow(face: EnrolledFace, usable: Boolean, onDeleteRequest: (EnrolledFace) -> Unit) {
+private fun EnrolledRow(face: EnrolledFace, usable: Boolean, sameModel: Boolean, onDeleteRequest: (EnrolledFace) -> Unit) {
     val date = remember(face.enrolledAtMillis) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(face.enrolledAtMillis))
     }
@@ -297,7 +343,12 @@ private fun EnrolledRow(face: EnrolledFace, usable: Boolean, onDeleteRequest: (E
             Text(face.name, style = FaceTypography.BodySemiBold, color = if (usable) FaceColors.TextPrimary else FaceColors.TextMuted)
             Text(stringResource(R.string.harness_enrolled_at, date, modelName), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
             if (!usable) {
-                Text(stringResource(R.string.harness_other_model), style = FaceTypography.CaptionSmall, color = FaceColors.MismatchRed)
+                // Same model but not usable means an older face pipeline made it: enrol again.
+                Text(
+                    stringResource(if (sameModel) R.string.harness_old_pipeline else R.string.harness_other_model),
+                    style = FaceTypography.CaptionSmall,
+                    color = FaceColors.MismatchRed,
+                )
             }
         }
         Box(
@@ -361,6 +412,104 @@ private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo, aligned: 
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TestSetupCard(setup: TesterSetup, usable: List<EnrolledFace>, actions: HomeActions) {
+    Card {
+        Text(stringResource(R.string.harness_setup_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
+        Text(stringResource(R.string.harness_setup_hint), style = FaceTypography.Body, color = FaceColors.TextMuted)
+        ChipGroup(R.string.harness_setup_scenario) {
+            TestScenario.entries.forEach { s -> Chip(stringResource(s.labelRes()), setup.scenario == s) { actions.onSetup(setup.copy(scenario = s)) } }
+        }
+        if (setup.scenario == TestScenario.Me && usable.size > 1) {
+            ChipGroup(R.string.harness_setup_person) {
+                usable.forEach { p -> Chip(p.name, setup.expectedFaceId == p.id) { actions.onSetup(setup.copy(expectedFaceId = p.id)) } }
+            }
+        }
+        ChipGroup(R.string.harness_setup_lighting) {
+            Lighting.entries.forEach { l -> Chip(stringResource(l.labelRes()), setup.lighting == l) { actions.onSetup(setup.copy(lighting = l)) } }
+        }
+        FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip(stringResource(R.string.harness_setup_glasses), setup.glasses) { actions.onSetup(setup.copy(glasses = !setup.glasses)) }
+            Chip(stringResource(R.string.harness_setup_covered), setup.faceCovered) { actions.onSetup(setup.copy(faceCovered = !setup.faceCovered)) }
+        }
+    }
+}
+
+@Composable
+private fun SharingCard(ui: HomeUi, actions: HomeActions) {
+    val on = ui.consent == ConsentState.Granted
+    var confirmCrops by rememberSaveable { mutableStateOf(false) }
+    Card {
+        Text(stringResource(R.string.harness_share_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
+        Text(stringResource(R.string.harness_share_body), style = FaceTypography.Body, color = FaceColors.TextMuted)
+        Row(Modifier.padding(top = 6.dp)) {
+            Chip(stringResource(if (on) R.string.harness_share_on else R.string.harness_share_off), selected = on) { actions.onConsent(!on) }
+        }
+        if (on) {
+            Text(
+                stringResource(R.string.harness_share_status, ui.uploads.delivered, ui.uploads.waiting, ui.uploads.failed),
+                style = FaceTypography.CaptionSmall,
+                color = FaceColors.TextMuted,
+            )
+            ui.installId?.let {
+                Text(stringResource(R.string.harness_share_id, it.take(8)), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
+            }
+            val crops = ui.cropConsent == ConsentState.Granted
+            Text(
+                stringResource(R.string.harness_crops_body),
+                style = FaceTypography.Body,
+                color = FaceColors.TextMuted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Row(Modifier.padding(top = 6.dp)) {
+                Chip(stringResource(if (crops) R.string.harness_crops_on else R.string.harness_crops_off), selected = crops) {
+                    // Turning it off is immediate; turning it on asks first, in plain words.
+                    if (crops) actions.onCropConsent(false) else confirmCrops = true
+                }
+            }
+        }
+    }
+    if (confirmCrops) {
+        AlertDialog(
+            onDismissRequest = { confirmCrops = false },
+            title = { Text(stringResource(R.string.harness_crops_title), style = FaceTypography.CardTitle) },
+            text = { Text(stringResource(R.string.harness_crops_confirm), style = FaceTypography.Body) },
+            confirmButton = {
+                TextButton({
+                    actions.onCropConsent(true)
+                    confirmCrops = false
+                }) { Text(stringResource(R.string.harness_consent_agree), style = FaceTypography.BodySemiBold) }
+            },
+            dismissButton = {
+                TextButton({ confirmCrops = false }) { Text(stringResource(R.string.harness_consent_decline), style = FaceTypography.BodySemiBold) }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipGroup(label: Int, content: @Composable () -> Unit) {
+    Text(stringResource(label), style = FaceTypography.LabelSemiBold, color = FaceColors.TextMuted, modifier = Modifier.padding(top = 6.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+}
+
+private fun TestScenario.labelRes(): Int = when (this) {
+    TestScenario.Me -> R.string.harness_scenario_me
+    TestScenario.SomeoneElse -> R.string.harness_scenario_other
+    TestScenario.PhotoAttack -> R.string.harness_scenario_photo
+    TestScenario.ScreenReplay -> R.string.harness_scenario_replay
+}
+
+private fun Lighting.labelRes(): Int = when (this) {
+    Lighting.Bright -> R.string.harness_light_bright
+    Lighting.Normal -> R.string.harness_light_normal
+    Lighting.Dim -> R.string.harness_light_dim
+    Lighting.Backlit -> R.string.harness_light_backlit
+    Lighting.Outdoor -> R.string.harness_light_outdoor
 }
 
 @Composable
@@ -454,11 +603,11 @@ private fun HomeScreenPreview() {
     HomeScreen(
         HomeUi(
             faces = listOf(alex, EnrolledFace("2", "Sam", 1_791_524_040_000L, FaceModels.MobileFaceNet.id)),
-            active = ActiveFaceModel(FaceModels.SFace, 0.42f),
+            active = ActiveFaceModel(FaceModels.SFace, FaceModels.SFace.defaultThreshold),
             busy = false,
             lastCheck = LastCheck(FaceMatchResult(true, alex, 0.71f, true, null, null), FaceModels.SFace.id, "1", 0.71f),
             stats = CalibrationStats(genuine = listOf(0.71f, 0.66f), impostor = listOf(0.21f, 0.33f)),
-            debug = FaceDebugInfo(modelId = FaceModels.SFace.id, threshold = 0.42f, lastScore = 0.71f, runnerUpScore = 0.18f),
+            debug = FaceDebugInfo(modelId = FaceModels.SFace.id, threshold = FaceModels.SFace.defaultThreshold, lastScore = 0.71f, runnerUpScore = 0.18f),
         ),
         HomeActions({}, {}, {}, {}, {}, {}, {}),
     )

@@ -24,6 +24,7 @@
     <string name="face_hint_too_dark">আরও আলোতে আসুন</string>
     <string name="face_hint_too_bright">আলো খুব বেশি, সরাসরি আলো থেকে সরে আসুন</string>
     <string name="face_hint_blurry">ফোন স্থির রাখুন</string>
+    <string name="face_hint_bad_lighting">আলোর দিকে মুখ করুন, যেন মুখে সমান আলো পড়ে</string>
     <string name="face_hint_face_changed">একই ব্যক্তিকে ক্যামেরার সামনে রাখুন</string>
     <string name="face_sub_keep_in_oval">মুখ ডিম্বাকৃতির ভেতরে রাখুন</string>
     <string name="face_challenge_blink">ধীরে চোখের পলক ফেলুন</string>

@@ -1,4 +1,8 @@
 *.iml
+# Firebase project config and keys stay out of the public repo (see docs/firebase-setup.md).
+app/google-services.json
+*service-account*.json
+*serviceAccount*.json
 .gradle
 /local.properties
 /.idea/caches

@@ -24,6 +24,7 @@
     <string name="face_hint_too_dark">Find more light</string>
     <string name="face_hint_too_bright">Too bright, move out of direct light</string>
     <string name="face_hint_blurry">Hold the phone still</string>
+    <string name="face_hint_bad_lighting">Face a light, keep it even on your face</string>
     <string name="face_hint_face_changed">Keep the same person in view</string>
     <string name="face_sub_keep_in_oval">Keep your face inside the oval</string>
     <string name="face_challenge_blink">Blink slowly</string>

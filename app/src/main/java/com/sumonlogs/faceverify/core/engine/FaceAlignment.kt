@@ -11,11 +11,15 @@ data class Similarity(val a: Float, val b: Float, val tx: Float, val ty: Float) 
  */
 object FaceAlignment {
 
-    /** Person's right eye (image left), left eye, nose, right mouth corner, left mouth corner. */
+    /**
+     * Person's right eye (image left), left eye, right mouth corner, left mouth corner. The template
+     * also has a nose point, (56.03, 71.74), but that is the nose TIP while ML Kit reports the nose BASE,
+     * lower on the face. Fitting one to the other would pull every crop off by a pitch-dependent amount,
+     * so the nose is left out and the four points that mean the same thing in both are used.
+     */
     private val TEMPLATE = listOf(
         Point(38.2946f, 51.6963f),
         Point(73.5318f, 51.5014f),
-        Point(56.0252f, 71.7366f),
         Point(41.5493f, 92.3655f),
         Point(70.7299f, 92.2041f),
     )
@@ -23,10 +27,10 @@ object FaceAlignment {
 
     /**
      * Least-squares similarity from the face's landmarks to the template scaled to [size].
-     * Uses every landmark ML Kit found; needs at least both eyes, otherwise returns null.
+     * Uses the eyes and every mouth corner ML Kit found; needs at least both eyes, otherwise returns null.
      */
     fun estimate(face: FaceObservation, size: Int): Similarity? {
-        val landmarks = listOf(face.rightEye, face.leftEye, face.noseBase, face.mouthRight, face.mouthLeft)
+        val landmarks = listOf(face.rightEye, face.leftEye, face.mouthRight, face.mouthLeft)
         if (landmarks[0] == null || landmarks[1] == null) return null
         val scale = size / TEMPLATE_SIZE
         val src = mutableListOf<Point>()

@@ -6,6 +6,13 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.serialization'
 }
 
+// Firebase is only switched on when google-services.json is in this folder. It is not committed (see
+// docs/firebase-setup.md), so the project still builds and runs, with data sharing off, without it.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+    apply plugin: 'com.google.firebase.crashlytics'
+}
+
 android {
     namespace = 'com.sumonlogs.faceverify'
     compileSdk = 37
@@ -80,6 +87,12 @@ dependencies {
     implementation 'androidx.camera:camera-view:1.4.2'
     implementation 'com.google.mlkit:face-detection:16.1.7'
     implementation 'com.google.ai.edge.litert:litert:1.4.1'
+
+    // Tester data collection (test app only; the reusable core never touches these). Anonymous numbers go
+    // to Firestore and crashes to Crashlytics, both only after the tester agrees.
+    implementation platform('com.google.firebase:firebase-bom:35.0.2')
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-crashlytics'
 
     // Installs the baseline profile (src/main/baseline-prof.txt) so the first run is already compiled.
     implementation 'androidx.profileinstaller:profileinstaller:1.4.1'

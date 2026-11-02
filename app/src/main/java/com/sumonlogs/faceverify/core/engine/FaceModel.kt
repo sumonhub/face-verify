@@ -17,18 +17,18 @@ data class FaceModelSpec(
     val displayName: String,
     val assetFile: String,
     val normalization: PixelNormalization,
-    /** Starting cosine threshold; calibrate on real people and override it in the settings. */
+    /** Starting cosine threshold. Strict on purpose; calibrate on real people and override it in the settings. */
     val defaultThreshold: Float,
 )
 
 object FaceModels {
-    /** OpenCV SFace, Apache-2.0. OpenCV's own reference threshold is 0.363; we start stricter. */
+    /** OpenCV SFace, Apache-2.0. OpenCV's own reference threshold is 0.363; we start far stricter, at 0.75. */
     val SFace = FaceModelSpec(
         id = "sface-2021dec",
         displayName = "SFace",
         assetFile = "SFace.tflite",
         normalization = PixelNormalization.Raw,
-        defaultThreshold = 0.42f,
+        defaultThreshold = 0.75f,
     )
 
     /** MobileFaceNet converted by a third party; licence of the weights unclear (see its NOTICE). */
@@ -37,7 +37,7 @@ object FaceModels {
         displayName = "MobileFaceNet",
         assetFile = "MobileFaceNet.tflite",
         normalization = PixelNormalization.MinusOneToOne,
-        defaultThreshold = 0.65f,
+        defaultThreshold = 0.75f,
     )
 
     val all: List<FaceModelSpec> = listOf(SFace, MobileFaceNet)

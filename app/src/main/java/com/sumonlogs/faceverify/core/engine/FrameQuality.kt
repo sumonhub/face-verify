@@ -8,6 +8,9 @@ enum class QualityIssue {
     // Face crop (CropQuality)
     TooDark, TooBright, Blurry,
 
+    /** Flat or one-sided lighting on the face. */
+    BadLighting,
+
     /** A different person appeared mid-enrollment; it starts over. */
     FaceChanged,
 }

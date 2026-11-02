@@ -32,6 +32,16 @@ data class FaceConfig(
     val minBrightness: Float = 30f,
     val maxBrightness: Float = 215f,
     val minSharpness: Float = 15f,
+    /**
+     * Standard deviation of luma in the face crop below which the face is flat (washed out, fog, a screen
+     * glare) and above which the check is let through. Deliberately loose until real data says otherwise.
+     */
+    val minContrast: Float = 18f,
+    /**
+     * How much brighter one half of the face may be than the other, as a fraction of the mean. Side
+     * light or a window beside the face changes the embedding; only strong cases are turned away.
+     */
+    val maxLightImbalance: Float = 0.45f,
     /** A dark, bright or blurry crop is rejected at once, but the hint only shows after this many frames in a row. */
     val cropHintAfterFrames: Int = 6,
     /** Minimum time between two frames used for embeddings, so they aren't near-duplicates. */
@@ -51,9 +61,20 @@ data class FaceConfig(
     // Enrollment
     val enrollTurnYawDeg: Float = 18f,
     /** Front-facing frames embedded and averaged into a person's template. */
-    val enrollFrontFrames: Int = 5,
-    /** Every enrollment frame must be at least this similar to their average, or enrollment fails. */
-    val enrollConsistencyMin: Float = 0.5f,
+    val enrollFrontFrames: Int = 8,
+    /**
+     * Minimum time between two enrollment frames. Much longer than [captureSpacingMs]: a template built
+     * from frames a fraction of a second apart is one photo taken eight times; a few seconds of natural
+     * movement and expression is what it needs to cover the person.
+     */
+    val enrollSpacingMs: Long = 350L,
+    /**
+     * A frame less similar than this to the average of all frames is dropped as an outlier (a blink, a
+     * blur, a different person walking in). Conservative until real data says otherwise.
+     */
+    val enrollConsistencyMin: Float = 0.6f,
+    /** Enrollment fails when fewer front frames than this survive the outlier check. */
+    val enrollMinKept: Int = 5,
 
     // Inference
     /** CPU threads for the face-embedding model. */
