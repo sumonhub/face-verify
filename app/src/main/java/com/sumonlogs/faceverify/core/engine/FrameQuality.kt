@@ -52,7 +52,7 @@ object FrameQuality {
     }
 
     fun isFront(face: FaceObservation, config: FaceConfig): Boolean =
-        abs(face.yaw) <= config.maxFrontYawDeg && abs(face.pitch) <= config.maxFrontPitchDeg
+        abs(face.yaw) <= config.maxCaptureYawDeg && abs(face.pitch) <= config.maxFrontPitchDeg
 
     /** Unknown eye state counts as open: ML Kit omits it for some frames. */
     fun eyesOpen(face: FaceObservation, config: FaceConfig): Boolean =

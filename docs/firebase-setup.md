@@ -3,9 +3,11 @@
 The test app can send anonymous numbers from each face check, and crash reports, to your own Firebase
 project. This guide takes you from nothing to a tester APK that reports back, and then to decisions.
 
-**What is sent (only after the tester taps Agree):** match scores, the anti-spoof score, timings, light
-and quality numbers, the lighting and scenario the tester chose, phone model, Android and app version, a
-random install id, and crash reports. **What is never sent:** photos, names, embeddings or any face data.
+**What is sent (always; this is a debug app with no sharing switch):** match scores, the
+anti-spoof score, timings, light and quality numbers, phone model, Android and app version, a random install
+id, crash reports, and the aligned 112×112 face crop of each check (to the `crops` collection). **What is
+never sent:** names or embeddings. Face crops are biometric data: tell every tester before they install, and
+delete the crops when testing ends.
 The exact list is `CheckRecord.toFields()` and `firestore.rules`; a unit test keeps the two in step.
 
 Everything below is free on Firebase's Spark plan for a tester group (Firestore allows 20,000 writes a
@@ -32,8 +34,7 @@ reading, editing or deleting from a phone.
 
 ## 3. Crash reports (optional)
 
-**Build > Crashlytics > Enable**. Crashes appear there a few minutes after they happen. Collection stays off
-until the tester agrees.
+**Build > Crashlytics > Enable**. Crashes appear there a few minutes after they happen. Collection is always on.
 
 ## 4. Build and sign the APK
 
@@ -59,27 +60,19 @@ Send `face-verify-tester.apk` to your testers. Android will ask them to allow in
 
 ## 5. Check that it works yourself first
 
-1. Install the APK on your phone and open the app. A consent dialog appears. Tap **Agree**.
+1. Install the APK on your phone and open the app. Sharing and face crops are already on.
 2. Enroll yourself, then run **Verify** once.
 3. In the Firebase console open **Firestore Database > Data**: a `checks` collection with one document
-   should appear within seconds. The app's **Share test data** card shows "Sent 1".
+   should appear within seconds. The app's **Debug data** card shows "Sent 1".
 
 If "failed" counts go up instead, the rules aren't published or the field list differs from the app's.
 
 ## 6. What to ask testers to do
 
-Each tester enrolls once, then runs about 10 checks in each situation, setting **Test setup** first so the
-data knows the right answer:
-
-| Test setup | What to do | Why |
-|---|---|---|
-| Me, light: Normal / Bright / Dim | Verify as yourself | Real-user scores and "too dark" behaviour |
-| Me, light: Window behind me / Outdoors | Verify as yourself | Hard lighting |
-| Me, with Glasses, or Cap or mask | Verify as yourself | Real-world false rejects |
-| Someone else | A different tester tries to verify as the enrolled person | **Strangers let in** (the security number) |
-| Someone else (look-alike) | A relative or look-alike tries | The hardest strangers |
-| Photo of someone | Hold a printed or on-screen photo of the enrolled person | Spoof protection |
-| Video on a screen | Play a video of the enrolled person on another phone | Spoof protection |
+Each tester enrolls once, then runs about 10 face checks as themselves, in normal, bright and dim light,
+with and without glasses. The test app has no setup screen, so every record is saved as "the enrolled
+person, normal light": keep strangers, photos and video replays out of shared checks, or the false-accept
+numbers will be wrong.
 
 Ask them to use different phones and to turn **Sharing: on**. Several people and phones matter more than
 many checks from one person.
@@ -104,9 +97,7 @@ default threshold in `FaceModel.kt`, then ship a new build and repeat.
 ## 8. Optional: face crops for the offline model comparison
 
 Numbers from checks say how the app behaves; they cannot compare models or template strategies. For that
-`tools/face_eval.py` needs the aligned face pictures. The app can send them, but only when a tester turns on
-**Face images** in the Share test data card (off by default, its own confirmation dialog, separate from
-the numbers consent):
+`tools/face_eval.py` needs the aligned face pictures. The app always sends them, with these limits:
 
 - Only the aligned 112×112 crop of a check where the tester was the enrolled person ("Me"), the check got as far
   as a comparison, and it was not a spoof. Never someone else, never the camera view, never a name.
@@ -127,7 +118,7 @@ is over (`export_crops.py --delete-install <id> --yes` removes one tester's rows
 
 ## Privacy and housekeeping
 
-- Tell testers what is collected before they start; the in-app consent dialogs say the same.
+- Tell anyone who tests the app what it collects before they start: there is no in-app consent step.
 - Records have a random install id, not a name. To delete one tester's data, delete the documents with
   their install id (shown in the app as "Tester ID", first 8 characters).
 - The `google-services.json` inside the APK can be extracted, so anyone could try to add records. The rules

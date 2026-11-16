@@ -22,6 +22,7 @@ class FaceCameraAnalyzer(
     private val onFrame: (FaceFrame) -> Unit,
     private val onError: (Throwable) -> Unit,
     private val onTiming: TimingSink = { _, _ -> },
+    private val exposure: FaceExposure? = null,
 ) : ImageAnalysis.Analyzer {
 
     override fun analyze(proxy: ImageProxy) {
@@ -31,7 +32,10 @@ class FaceCameraAnalyzer(
             val faces = detector.detect(proxy)
             val detectMs = SystemClock.elapsedRealtime() - t0
             onTiming("detect", detectMs.toFloat())
-            frame = ProxyFaceFrame(proxy, faces, detectMs, t0).also(onFrame)
+            val current = ProxyFaceFrame(proxy, faces, detectMs, t0)
+            frame = current
+            exposure?.onFaces(proxy, faces, current.width, current.height, t0)
+            onFrame(current)
         } catch (e: Exception) {
             Log.w(TAG, "Frame analysis failed", e)
             onError(e)

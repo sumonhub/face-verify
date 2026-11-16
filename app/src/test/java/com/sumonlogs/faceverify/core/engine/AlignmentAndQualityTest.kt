@@ -52,6 +52,44 @@ class AlignmentAndQualityTest {
     }
 
     @Test
+    fun `weights do not change an exact fit`() {
+        val truth = Similarity(a = 0.6f * cos(0.2f), b = 0.6f * sin(0.2f), tx = 3f, ty = 9f)
+        val src = listOf(Point(10f, 20f), Point(60f, 22f), Point(35f, 50f), Point(15f, 80f))
+        val fit = FaceAlignment.leastSquares(src, src.map(truth::apply), listOf(1f, 1f, 0.5f, 0.5f))
+        assertEquals(truth.a, fit.a, 1e-4f)
+        assertEquals(truth.b, fit.b, 1e-4f)
+        assertEquals(truth.tx, fit.tx, 1e-2f)
+        assertEquals(truth.ty, fit.ty, 1e-2f)
+    }
+
+    @Test
+    fun `a smile moves the eyes less than it would with equal weights`() {
+        // Perfect eyes, and mouth corners pulled 10 px outward each side (a broad smile).
+        val eyes = listOf(Point(200f, 300f), Point(280f, 300f))
+        val smile = eyes + listOf(Point(200f, 380f), Point(280f, 380f))
+        val smiling = face().copy(rightEye = smile[0], leftEye = smile[1], mouthRight = smile[2], mouthLeft = smile[3])
+        val weighted = requireNotNull(FaceAlignment.estimate(smiling, 112))
+        val template = listOf(Point(38.2946f, 51.6963f), Point(73.5318f, 51.5014f), Point(41.5493f, 92.3655f), Point(70.7299f, 92.2041f))
+        val equal = FaceAlignment.leastSquares(smile, template)
+
+        fun eyeError(fit: Similarity) = eyes.indices.sumOf { i ->
+            val p = fit.apply(eyes[i])
+            val dx = (p.x - template[i].x).toDouble()
+            val dy = (p.y - template[i].y).toDouble()
+            kotlin.math.sqrt(dx * dx + dy * dy)
+        }
+        assertTrue("weighted ${eyeError(weighted)} vs equal ${eyeError(equal)}", eyeError(weighted) < eyeError(equal))
+    }
+
+    @Test
+    fun `matching frames must be nearly straight on`() {
+        val config = FaceConfig()
+        assertTrue(FrameQuality.isFront(face(yaw = 7f), config))
+        assertTrue(FrameQuality.isFront(face(yaw = -7f, pitch = 10f), config))
+        assertTrue("past the capture limit", !FrameQuality.isFront(face(yaw = 10f), config))
+    }
+
+    @Test
     fun `no alignment without both eyes`() {
         assertNull(FaceAlignment.estimate(face().copy(leftEye = null), 112))
     }

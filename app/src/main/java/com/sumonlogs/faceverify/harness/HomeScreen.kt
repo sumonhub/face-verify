@@ -34,11 +34,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,10 +58,6 @@ import com.sumonlogs.faceverify.core.ui.components.FaceGlyph
 import com.sumonlogs.faceverify.core.ui.components.FaceIcon
 import com.sumonlogs.faceverify.core.ui.theme.FaceColors
 import com.sumonlogs.faceverify.core.ui.theme.FaceTypography
-import com.sumonlogs.faceverify.harness.telemetry.ConsentState
-import com.sumonlogs.faceverify.harness.telemetry.Lighting
-import com.sumonlogs.faceverify.harness.telemetry.TestScenario
-import com.sumonlogs.faceverify.harness.telemetry.TesterSetup
 import com.sumonlogs.faceverify.harness.telemetry.UploadStats
 import java.text.DateFormat
 import java.util.Date
@@ -80,17 +78,14 @@ fun HomeRoute(
     val timings by diagnostics.stageTimings.collectAsStateWithLifecycle()
     val aligned by diagnostics.alignedFace.collectAsStateWithLifecycle()
     val bench by controller.bench.collectAsStateWithLifecycle()
-    val setup by controller.setup.collectAsStateWithLifecycle()
-    val consent by controller.consent.collectAsStateWithLifecycle()
     val uploads by controller.uploads.collectAsStateWithLifecycle()
     val installId by controller.installId.collectAsStateWithLifecycle()
-    val cropConsent by controller.cropConsent.collectAsStateWithLifecycle()
+    val tally by controller.tally.collectAsStateWithLifecycle()
     HomeScreen(
         HomeUi(
             faces = faces, active = active, busy = busy, lastCheck = lastCheck, stats = stats, debug = debug,
-            timings = timings, aligned = aligned, bench = bench,
-            sharingAvailable = controller.sharingAvailable, consent = consent, setup = setup,
-            uploads = uploads, installId = installId, cropConsent = cropConsent,
+            timings = timings, aligned = aligned, bench = bench, tally = tally,
+            sharingAvailable = controller.sharingAvailable, uploads = uploads, installId = installId,
         ),
         HomeActions(
             onEnroll = onEnroll,
@@ -98,13 +93,11 @@ fun HomeRoute(
             onDelete = controller::delete,
             onSelectModel = controller::selectModel,
             onThreshold = controller::setThreshold,
-            onLabel = controller::label,
+            onAnswer = controller::answer,
+            onClearVerdicts = controller::clearVerdicts,
             onClearCalibration = controller::clearCalibration,
             onBenchmark = controller::runBenchmark,
             onClearTimings = controller::clearTimings,
-            onSetup = controller::updateSetup,
-            onConsent = controller::setConsent,
-            onCropConsent = controller::setCropConsent,
         ),
     )
 }
@@ -119,14 +112,12 @@ data class HomeUi(
     val timings: List<StageTiming> = emptyList(),
     val aligned: AlignedPreview? = null,
     val bench: BenchState = BenchState.Idle,
-    /** False when this build has no Firebase project: all the data-sharing UI is hidden. */
+    /** The tester's right / wrong answers for the active model. */
+    val tally: VerdictTally = VerdictTally(),
+    /** False hides the debug data card (no Firebase project in this build: nothing is sent then). */
     val sharingAvailable: Boolean = false,
-    val consent: ConsentState = ConsentState.Loading,
-    val setup: TesterSetup = TesterSetup(),
     val uploads: UploadStats = UploadStats(),
     val installId: String? = null,
-    /** Separate from [consent]: sending aligned face images, off until the tester turns it on. */
-    val cropConsent: ConsentState = ConsentState.Declined,
 )
 
 class HomeActions(
@@ -136,13 +127,12 @@ class HomeActions(
     val onSelectModel: (String) -> Unit,
     /** null resets to the model's default. */
     val onThreshold: (Float?) -> Unit,
-    val onLabel: (CheckLabel) -> Unit,
+    /** The tester's verdict on the last check: true when what the app did was right. */
+    val onAnswer: (Boolean) -> Unit,
     val onClearCalibration: () -> Unit,
+    val onClearVerdicts: () -> Unit = {},
     val onBenchmark: () -> Unit = {},
     val onClearTimings: () -> Unit = {},
-    val onSetup: (TesterSetup) -> Unit = {},
-    val onConsent: (Boolean) -> Unit = {},
-    val onCropConsent: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -161,36 +151,25 @@ fun HomeScreen(ui: HomeUi, actions: HomeActions) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.app_name), style = FaceTypography.ScreenTitle, color = FaceColors.TextPrimary)
+        // The model comes first: enrolling and verifying both use it. Then verify (the everyday action),
+        // enroll, and the people enrolled with this model; then the result and the count.
         if (ui.active != null) ModelCard(ui.active, actions)
-        if (ui.sharingAvailable) {
-            TestSetupCard(ui.setup, usable, actions)
-            SharingCard(ui, actions)
-        }
-        FaceButton(stringResource(R.string.harness_enroll), actions.onEnroll, glyph = FaceGlyph.Person)
+        val verdictPending = ui.lastCheck?.needsVerdict == true
         FaceButton(
             stringResource(if (ui.busy) R.string.harness_verifying else R.string.harness_verify),
             actions.onVerify,
-            enabled = !ui.busy && usable.isNotEmpty(),
+            enabled = !ui.busy && usable.isNotEmpty() && !verdictPending,
         )
-        ui.lastCheck?.let { ResultCard(it, usable, actions.onLabel) }
-        if (ui.active != null) CalibrationCard(ui.active, ui.stats, actions)
+        FaceButton(stringResource(R.string.harness_enroll), actions.onEnroll, glyph = FaceGlyph.Person)
         EnrolledList(ui.faces, activeId, onDeleteRequest = { pendingDeleteId = it.id })
+        ui.lastCheck?.let { ResultCard(it, actions.onAnswer) }
+        VerdictCard(ui.tally, ui.active, actions)
+        if (ui.sharingAvailable) {
+            SharingCard(ui)
+        }
+        if (ui.active != null) CalibrationCard(ui.active, ui.stats, actions)
         PerformanceCard(ui, actions)
         DebugPanel(ui.lastCheck?.result, ui.debug, ui.aligned)
-    }
-
-    if (ui.sharingAvailable && ui.consent == ConsentState.NotAsked) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text(stringResource(R.string.harness_consent_title), style = FaceTypography.CardTitle) },
-            text = { Text(stringResource(R.string.harness_consent_body), style = FaceTypography.Body) },
-            confirmButton = {
-                TextButton({ actions.onConsent(true) }) { Text(stringResource(R.string.harness_consent_agree), style = FaceTypography.BodySemiBold) }
-            },
-            dismissButton = {
-                TextButton({ actions.onConsent(false) }) { Text(stringResource(R.string.harness_consent_decline), style = FaceTypography.BodySemiBold) }
-            },
-        )
     }
 
     val pending = ui.faces?.firstOrNull { it.id == pendingDeleteId }
@@ -252,9 +231,8 @@ private fun ModelCard(active: ActiveFaceModel, actions: HomeActions) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ResultCard(check: LastCheck, usable: List<EnrolledFace>, onLabel: (CheckLabel) -> Unit) {
+private fun ResultCard(check: LastCheck, onAnswer: (Boolean) -> Unit) {
     val result = check.result
     val face = result.face
     val failure = result.failure
@@ -267,19 +245,59 @@ private fun ResultCard(check: LastCheck, usable: List<EnrolledFace>, onLabel: (C
         Text(stringResource(R.string.harness_last_result), style = FaceTypography.CardTitle, color = FaceColors.Navy)
         Text(text, style = FaceTypography.BodyStrong, color = if (result.matched) FaceColors.SuccessBadge else FaceColors.MismatchRed)
         when {
-            check.labelled -> Text(stringResource(R.string.harness_label_saved), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
-            check.labellable -> {
+            check.answered -> Text(stringResource(R.string.harness_verdict_saved), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
+            check.needsVerdict -> {
                 Text(
-                    stringResource(R.string.harness_label_question),
-                    style = FaceTypography.LabelSemiBold,
-                    color = FaceColors.TextMuted,
+                    stringResource(R.string.harness_verdict_question),
+                    style = FaceTypography.BodySemiBold,
+                    color = FaceColors.TextPrimary,
                     modifier = Modifier.padding(top = 6.dp),
                 )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    usable.forEach { person -> Chip(person.name, selected = false) { onLabel(CheckLabel.Person(person.id)) } }
-                    Chip(stringResource(R.string.harness_label_not_enrolled), selected = false) { onLabel(CheckLabel.NotEnrolled) }
+                Text(stringResource(R.string.harness_verdict_hint), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    VerdictButton(stringResource(R.string.harness_verdict_right), FaceColors.SuccessBadge, Modifier.weight(1f)) { onAnswer(true) }
+                    VerdictButton(stringResource(R.string.harness_verdict_wrong), FaceColors.MismatchRed, Modifier.weight(1f)) { onAnswer(false) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun VerdictButton(text: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Text(
+        text = text,
+        style = FaceTypography.BodySemiBold,
+        color = FaceColors.White,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .background(color, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 14.dp),
+    )
+}
+
+@Composable
+private fun VerdictCard(tally: VerdictTally, active: ActiveFaceModel?, actions: HomeActions) {
+    Card {
+        Text(
+            stringResource(R.string.harness_tally_title, active?.model?.displayName.orEmpty()),
+            style = FaceTypography.CardTitle,
+            color = FaceColors.Navy,
+        )
+        if (tally.total == 0) {
+            Text(stringResource(R.string.harness_tally_empty), style = FaceTypography.Body, color = FaceColors.TextMuted)
+            return@Card
+        }
+        DebugRow(R.string.harness_tally_right, "${tally.right} / ${tally.total} · ${tally.rightPercent}%")
+        DebugRow(R.string.harness_tally_wrong, "${tally.wrong}")
+        DebugRow(R.string.harness_tally_accepted, "${tally.accepted}")
+        DebugRow(R.string.harness_tally_refused, "${tally.refused}")
+        DebugRow(R.string.harness_tally_wrong_accepted, "${tally.wrongAccepted}")
+        DebugRow(R.string.harness_tally_wrong_refused, "${tally.wrongRefused}")
+        TextButton(actions.onClearVerdicts) {
+            Text(stringResource(R.string.harness_tally_clear), style = FaceTypography.LabelSemiBold, color = FaceColors.MismatchRed)
         }
     }
 }
@@ -323,16 +341,21 @@ private fun EnrolledList(faces: List<EnrolledFace>?, activeModelId: String?, onD
         Text(stringResource(R.string.harness_enrolled_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
         when {
             faces == null -> Text(stringResource(R.string.harness_loading), style = FaceTypography.Body, color = FaceColors.TextMuted)
-            faces.isEmpty() -> Text(stringResource(R.string.harness_enrolled_empty), style = FaceTypography.Body, color = FaceColors.TextMuted)
-            else -> faces.forEach { face ->
-                EnrolledRow(face, usable = face.isUsableWith(activeModelId), sameModel = face.modelId == activeModelId, onDeleteRequest)
+            else -> {
+                // Only the selected model's people: the others can't be matched with it anyway, and they
+                // come back when their model is selected.
+                val forModel = faces.filter { it.modelId == activeModelId }
+                if (forModel.isEmpty()) {
+                    Text(stringResource(R.string.harness_enrolled_empty), style = FaceTypography.Body, color = FaceColors.TextMuted)
+                }
+                forModel.forEach { face -> EnrolledRow(face, usable = face.isUsableWith(activeModelId), onDeleteRequest) }
             }
         }
     }
 }
 
 @Composable
-private fun EnrolledRow(face: EnrolledFace, usable: Boolean, sameModel: Boolean, onDeleteRequest: (EnrolledFace) -> Unit) {
+private fun EnrolledRow(face: EnrolledFace, usable: Boolean, onDeleteRequest: (EnrolledFace) -> Unit) {
     val date = remember(face.enrolledAtMillis) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(face.enrolledAtMillis))
     }
@@ -345,7 +368,7 @@ private fun EnrolledRow(face: EnrolledFace, usable: Boolean, sameModel: Boolean,
             if (!usable) {
                 // Same model but not usable means an older face pipeline made it: enrol again.
                 Text(
-                    stringResource(if (sameModel) R.string.harness_old_pipeline else R.string.harness_other_model),
+                    stringResource(R.string.harness_old_pipeline),
                     style = FaceTypography.CaptionSmall,
                     color = FaceColors.MismatchRed,
                 )
@@ -414,102 +437,22 @@ private fun DebugPanel(result: FaceMatchResult?, debug: FaceDebugInfo, aligned: 
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Upload status of the debug data that every check sends to Firebase. */
 @Composable
-private fun TestSetupCard(setup: TesterSetup, usable: List<EnrolledFace>, actions: HomeActions) {
-    Card {
-        Text(stringResource(R.string.harness_setup_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
-        Text(stringResource(R.string.harness_setup_hint), style = FaceTypography.Body, color = FaceColors.TextMuted)
-        ChipGroup(R.string.harness_setup_scenario) {
-            TestScenario.entries.forEach { s -> Chip(stringResource(s.labelRes()), setup.scenario == s) { actions.onSetup(setup.copy(scenario = s)) } }
-        }
-        if (setup.scenario == TestScenario.Me && usable.size > 1) {
-            ChipGroup(R.string.harness_setup_person) {
-                usable.forEach { p -> Chip(p.name, setup.expectedFaceId == p.id) { actions.onSetup(setup.copy(expectedFaceId = p.id)) } }
-            }
-        }
-        ChipGroup(R.string.harness_setup_lighting) {
-            Lighting.entries.forEach { l -> Chip(stringResource(l.labelRes()), setup.lighting == l) { actions.onSetup(setup.copy(lighting = l)) } }
-        }
-        FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip(stringResource(R.string.harness_setup_glasses), setup.glasses) { actions.onSetup(setup.copy(glasses = !setup.glasses)) }
-            Chip(stringResource(R.string.harness_setup_covered), setup.faceCovered) { actions.onSetup(setup.copy(faceCovered = !setup.faceCovered)) }
-        }
-    }
-}
-
-@Composable
-private fun SharingCard(ui: HomeUi, actions: HomeActions) {
-    val on = ui.consent == ConsentState.Granted
-    var confirmCrops by rememberSaveable { mutableStateOf(false) }
+private fun SharingCard(ui: HomeUi) {
     Card {
         Text(stringResource(R.string.harness_share_title), style = FaceTypography.CardTitle, color = FaceColors.Navy)
         Text(stringResource(R.string.harness_share_body), style = FaceTypography.Body, color = FaceColors.TextMuted)
-        Row(Modifier.padding(top = 6.dp)) {
-            Chip(stringResource(if (on) R.string.harness_share_on else R.string.harness_share_off), selected = on) { actions.onConsent(!on) }
-        }
-        if (on) {
-            Text(
-                stringResource(R.string.harness_share_status, ui.uploads.delivered, ui.uploads.waiting, ui.uploads.failed),
-                style = FaceTypography.CaptionSmall,
-                color = FaceColors.TextMuted,
-            )
-            ui.installId?.let {
-                Text(stringResource(R.string.harness_share_id, it.take(8)), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
-            }
-            val crops = ui.cropConsent == ConsentState.Granted
-            Text(
-                stringResource(R.string.harness_crops_body),
-                style = FaceTypography.Body,
-                color = FaceColors.TextMuted,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Row(Modifier.padding(top = 6.dp)) {
-                Chip(stringResource(if (crops) R.string.harness_crops_on else R.string.harness_crops_off), selected = crops) {
-                    // Turning it off is immediate; turning it on asks first, in plain words.
-                    if (crops) actions.onCropConsent(false) else confirmCrops = true
-                }
-            }
-        }
-    }
-    if (confirmCrops) {
-        AlertDialog(
-            onDismissRequest = { confirmCrops = false },
-            title = { Text(stringResource(R.string.harness_crops_title), style = FaceTypography.CardTitle) },
-            text = { Text(stringResource(R.string.harness_crops_confirm), style = FaceTypography.Body) },
-            confirmButton = {
-                TextButton({
-                    actions.onCropConsent(true)
-                    confirmCrops = false
-                }) { Text(stringResource(R.string.harness_consent_agree), style = FaceTypography.BodySemiBold) }
-            },
-            dismissButton = {
-                TextButton({ confirmCrops = false }) { Text(stringResource(R.string.harness_consent_decline), style = FaceTypography.BodySemiBold) }
-            },
+        Text(
+            stringResource(R.string.harness_share_status, ui.uploads.delivered, ui.uploads.waiting, ui.uploads.failed),
+            style = FaceTypography.CaptionSmall,
+            color = FaceColors.TextMuted,
+            modifier = Modifier.padding(top = 6.dp),
         )
+        ui.installId?.let {
+            Text(stringResource(R.string.harness_share_id, it.take(8)), style = FaceTypography.CaptionSmall, color = FaceColors.TextMuted)
+        }
     }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipGroup(label: Int, content: @Composable () -> Unit) {
-    Text(stringResource(label), style = FaceTypography.LabelSemiBold, color = FaceColors.TextMuted, modifier = Modifier.padding(top = 6.dp))
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
-}
-
-private fun TestScenario.labelRes(): Int = when (this) {
-    TestScenario.Me -> R.string.harness_scenario_me
-    TestScenario.SomeoneElse -> R.string.harness_scenario_other
-    TestScenario.PhotoAttack -> R.string.harness_scenario_photo
-    TestScenario.ScreenReplay -> R.string.harness_scenario_replay
-}
-
-private fun Lighting.labelRes(): Int = when (this) {
-    Lighting.Bright -> R.string.harness_light_bright
-    Lighting.Normal -> R.string.harness_light_normal
-    Lighting.Dim -> R.string.harness_light_dim
-    Lighting.Backlit -> R.string.harness_light_backlit
-    Lighting.Outdoor -> R.string.harness_light_outdoor
 }
 
 @Composable
@@ -607,6 +550,7 @@ private fun HomeScreenPreview() {
             busy = false,
             lastCheck = LastCheck(FaceMatchResult(true, alex, 0.71f, true, null, null), FaceModels.SFace.id, "1", 0.71f),
             stats = CalibrationStats(genuine = listOf(0.71f, 0.66f), impostor = listOf(0.21f, 0.33f)),
+            tally = VerdictTally(accepted = 6, refused = 2, wrongAccepted = 0, wrongRefused = 2),
             debug = FaceDebugInfo(modelId = FaceModels.SFace.id, threshold = FaceModels.SFace.defaultThreshold, lastScore = 0.71f, runnerUpScore = 0.18f),
         ),
         HomeActions({}, {}, {}, {}, {}, {}, {}),

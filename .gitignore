@@ -3,6 +3,11 @@
 app/google-services.json
 *service-account*.json
 *serviceAccount*.json
+# Tester data is biometric: face crops, exported check records and embeddings never go into git.
+/eval-data/
+/crops/
+/checks*.csv
+*.npz
 .gradle
 /local.properties
 /.idea/caches

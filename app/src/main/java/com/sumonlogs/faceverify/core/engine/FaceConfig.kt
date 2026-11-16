@@ -16,7 +16,15 @@ data class FaceConfig(
     /** Faces narrower than this are background people and are ignored when counting faces. */
     val bystanderWidthRatio: Float = 0.12f,
     val maxRollDeg: Float = 12f,
+    /** "Facing the camera" for the liveness baseline (back to front after a turn). */
     val maxFrontYawDeg: Float = 12f,
+    /**
+     * Frames used for matching and enrollment must be this close to straight on. Alignment fits a flat,
+     * frontal template, and the further the head is turned the more the landmarks sit off it, so the
+     * crop drifts with the pose. Tighter than [maxFrontYawDeg]; a few degrees of ML Kit's own yaw noise
+     * fit inside it.
+     */
+    val maxCaptureYawDeg: Float = 8f,
     val maxFrontPitchDeg: Float = 12f,
     val eyeOpenMin: Float = 0.60f,
     val eyeClosedMax: Float = 0.25f,
@@ -86,6 +94,29 @@ data class FaceConfig(
     /** The live preview is capped near this size (4:3): sharp enough for the oval, light on the GPU. */
     val previewWidth: Int = 960,
     val previewHeight: Int = 720,
+
+    /** Auto-exposure meters this share of the face width around its centre (see [FaceMetering]). */
+    val meteringFaceShare: Float = 0.6f,
+    /** Exposure is re-aimed when the face moves more than this fraction of the frame. */
+    val meteringMoveRatio: Float = 0.08f,
+    /** Exposure is never re-aimed more often than this; each request restarts the exposure search. */
+    val meteringMinIntervalMs: Long = 700L,
+    /**
+     * The camera is brightened (+EV) while the face's mean luma is below this, and darkened above
+     * [faceLumaHigh] (see [ExposureSteering]). Well above [minBrightness], so the crop clears it with room to spare.
+     */
+    val faceLumaLow: Float = 80f,
+    val faceLumaHigh: Float = 175f,
+    /**
+     * Time between two exposure changes. Auto-exposure plus the analysis pipeline take several hundred
+     * ms to show a change; deciding faster than that overshoots and swings the face dark and bright.
+     */
+    val exposureStepIntervalMs: Long = 900L,
+    /**
+     * Most the camera is ever brightened. Steering never darkens below the camera's own exposure: it
+     * only takes back its own boost, so it can't push a well lit face into "too dark".
+     */
+    val maxExposureBoostEv: Float = 2f,
 
     // Session
     val verifyTimeoutMs: Long = 25_000L,

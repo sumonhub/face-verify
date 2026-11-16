@@ -12,10 +12,13 @@ import java.io.IOException
  * landmarks align, the crop). Embeddings from different versions are close but not the same, and
  * compare lower, which looks like false rejects. Bump it with any change to that path; people enrolled
  * under another version are listed but not used, and must enrol again. History: 1 = ML Kit fast mode,
- * 5-point fit including the nose; 2 = ML Kit accurate mode, eyes and mouth corners only.
+ * 5-point fit including the nose; 2 = ML Kit accurate mode, eyes and mouth corners only; 3 = mouth
+ * corners count half as much as the eyes in the fit, and frames must be within 8° of straight on;
+ * 4 = landmarks matched to the template by image position, not ML Kit's left/right labels (those come
+ * out mirrored on front cameras, which squeezed the whole frame into a corner of every earlier crop).
  */
 object FaceTemplates {
-    const val PIPELINE_VERSION = 2
+    const val PIPELINE_VERSION = 4
 }
 
 /** One enrolled person: a display name and the front-facing embeddings made by [modelId] under [pipelineVersion]. */

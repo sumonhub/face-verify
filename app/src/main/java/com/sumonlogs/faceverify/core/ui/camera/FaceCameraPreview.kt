@@ -24,6 +24,7 @@ import com.sumonlogs.faceverify.core.engine.FaceConfig
 import com.sumonlogs.faceverify.core.engine.FaceFrame
 import com.sumonlogs.faceverify.core.engine.android.FaceCameraAnalyzer
 import com.sumonlogs.faceverify.core.engine.android.FaceCropper
+import com.sumonlogs.faceverify.core.engine.android.FaceExposure
 import com.sumonlogs.faceverify.core.engine.android.MlKitFaceDetector
 import org.koin.compose.koinInject
 import java.util.concurrent.Executors
@@ -76,9 +77,12 @@ fun FaceCameraPreview(
             .setResolutionSelector(resolution)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
+        val exposure = FaceExposure(config)
         analysis.setAnalyzer(
             executor,
-            FaceCameraAnalyzer(detector, cropper, config, { currentOnFrame(it) }, { currentOnError(it) }, diagnostics::recordTiming),
+            FaceCameraAnalyzer(
+                detector, cropper, config, { currentOnFrame(it) }, { currentOnError(it) }, diagnostics::recordTiming, exposure,
+            ),
         )
         var provider: ProcessCameraProvider? = null
         var disposed = false
@@ -93,7 +97,8 @@ fun FaceCameraPreview(
                 }
                 preview.surfaceProvider = previewView.surfaceProvider
                 cameraProvider.unbind(preview, analysis)
-                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
+                val camera = cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
+                exposure.attach(camera, analysis)
                 provider = cameraProvider
             } catch (e: Exception) {
                 currentOnError(e)
@@ -102,6 +107,7 @@ fun FaceCameraPreview(
 
         onDispose {
             disposed = true
+            exposure.detach()
             provider?.unbind(preview, analysis)
             analysis.clearAnalyzer()
             executor.shutdown()

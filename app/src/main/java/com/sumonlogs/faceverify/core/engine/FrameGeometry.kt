@@ -18,6 +18,15 @@ object FrameGeometry {
         else -> Similarity(a = 1f, b = 0f, tx = 0f, ty = 0f)
     }
 
+    /** The inverse of [rawToUpright]: an upright point back to the frame as the sensor delivered it. */
+    fun uprightToRaw(rotationDegrees: Int, rawWidth: Int, rawHeight: Int, p: Point): Point {
+        val m = rawToUpright(rotationDegrees, rawWidth, rawHeight)
+        // m is a pure rotation (a² + b² = 1) plus a shift, so its inverse is the transposed rotation.
+        val x = p.x - m.tx
+        val y = p.y - m.ty
+        return Point(m.a * x + m.b * y, -m.b * x + m.a * y)
+    }
+
     /**
      * The face box enlarged [scale] times around its centre, as the anti-spoof models were trained.
      * The box is shrunk to fit the frame and then slid back inside it, never padded, so the crop only

@@ -17,8 +17,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Sends one anonymous record per face check, and crash reports, but only after the tester agreed.
- * Test app only: the reusable face feature never sees this.
+ * Sends one record per face check, its aligned face crop, and crash reports to Firebase. Always on:
+ * this is a debug/test app, not something shipped to users. Test app only: the reusable face feature
+ * never sees this.
  */
 class TesterTelemetry(
     private val prefs: TesterPrefs,
@@ -33,8 +34,6 @@ class TesterTelemetry(
     /** False when this build has no Firebase project: the screens hide everything about sharing. */
     val available: Boolean get() = uploader.available
 
-    val consent: StateFlow<ConsentState> = prefs.consent.stateIn(scope, SharingStarted.Eagerly, ConsentState.Loading)
-    val cropConsent: StateFlow<ConsentState> = prefs.cropConsent.stateIn(scope, SharingStarted.Eagerly, ConsentState.Loading)
     val installId: StateFlow<String?> = prefs.installId.stateIn(scope, SharingStarted.Eagerly, null)
     val uploads: StateFlow<UploadStats> = uploader.stats
 
@@ -42,29 +41,17 @@ class TesterTelemetry(
     val setup: StateFlow<TesterSetup> = _setup.asStateFlow()
 
     init {
-        // Crash reports follow the tester's choice, including at the next app start.
-        scope.launch { consent.collect { uploader.setCrashReporting(it == ConsentState.Granted) } }
+        uploader.setCrashReporting(true)
     }
 
     fun updateSetup(setup: TesterSetup) {
         _setup.value = setup
     }
 
-    fun setConsent(granted: Boolean) {
-        scope.launch {
-            prefs.setConsent(granted)
-            if (granted) prefs.installId()
-        }
-    }
-
-    fun setCropConsent(granted: Boolean) {
-        scope.launch { prefs.setCropConsent(granted) }
-    }
-
     /**
      * @param usable the enrolled people of the model that was used; if there is exactly one, the "me"
      * scenario means them without the tester having to pick.
-     * @param crop the aligned face the model last saw; sent only if the tester also agreed to share crops.
+     * @param crop the aligned face the model last saw.
      */
     fun record(
         result: FaceMatchResult,
@@ -73,9 +60,14 @@ class TesterTelemetry(
         usable: List<EnrolledFace>,
         crop: AlignedPreview? = null,
     ) {
-        if (!uploader.available || consent.value != ConsentState.Granted) return
+        if (!uploader.available) return
         val setup = _setup.value
-        val expected = if (setup.scenario == TestScenario.Me) setup.expectedFaceId ?: usable.singleOrNull()?.id else null
+        // With no setup screen, the person is the only one enrolled, or else the one the check matched.
+        val expected = if (setup.scenario == TestScenario.Me) {
+            setup.expectedFaceId ?: usable.singleOrNull()?.id ?: result.face?.id
+        } else {
+            null
+        }
         scope.launch {
             val record = CheckRecord(
                 installId = prefs.installId(),
@@ -110,7 +102,7 @@ class TesterTelemetry(
                 timingP95Ms = timings.associate { it.stage to it.p95Ms },
             )
             uploader.upload(record.toFields())
-            if (crop != null && expected != null && cropConsent.value == ConsentState.Granted &&
+            if (crop != null && expected != null &&
                 CropRecord.eligible(record.scenario, record.livenessPassed, record.failure)
             ) {
                 uploader.uploadCrop(

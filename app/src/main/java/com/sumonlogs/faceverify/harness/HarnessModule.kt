@@ -12,6 +12,7 @@ import org.koin.dsl.module
 /** Test-app only. */
 val harnessModule = module {
     single { CalibrationLog(androidContext()) }
+    single { VerdictLog(androidContext()) }
     single { PerformanceBenchmark(androidContext()) }
     single { TesterPrefs(androidContext()) }
     single<CheckUploader> { FirestoreCheckUploader(androidContext()) }
@@ -19,5 +20,5 @@ val harnessModule = module {
     single(createdAtStart = true) {
         TesterTelemetry(get(), get(), BuildConfig.VERSION_NAME, "${Build.MANUFACTURER} ${Build.MODEL}", Build.VERSION.SDK_INT)
     }
-    single { HarnessController(get(), get(), get(), get(), get(), get()) }
+    single { HarnessController(get(), get(), get(), get(), get(), get(), get()) }
 }

@@ -20,23 +20,23 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Who was really in front of the camera, as the tester says. */
-sealed interface CheckLabel {
-    data class Person(val id: String) : CheckLabel
-    data object NotEnrolled : CheckLabel
-}
-
-/** The last check, with what's needed to label it for calibration. */
+/**
+ * The last check. Until the tester says whether the result was right ([answered]) no new check can
+ * start, so every check ends up counted.
+ */
 data class LastCheck(
     val result: FaceMatchResult,
     val modelId: String?,
     val bestFaceId: String?,
     val score: Float,
-    val labelled: Boolean = false,
+    val answered: Boolean = false,
 ) {
-    /** Only checks that produced a score (liveness passed, a comparison ran) can be labelled. */
-    val labellable: Boolean
-        get() = !labelled && bestFaceId != null && modelId != null &&
+    /** Cancelled, no permission and nobody enrolled say nothing about the face, so nothing to judge. */
+    val needsVerdict: Boolean get() = !answered && result.failure !in NOT_A_CHECK
+
+    /** Only checks that produced a score (liveness passed, a comparison ran) can feed the calibration numbers. */
+    val scored: Boolean
+        get() = bestFaceId != null && modelId != null &&
             result.livenessPassed && (result.failure == null || result.failure == FaceFailure.AmbiguousMatch)
 }
 
@@ -49,6 +49,7 @@ class HarnessController(
     private val settings: FaceModelSettings,
     private val diagnostics: FaceDiagnostics,
     private val calibration: CalibrationLog,
+    private val verdicts: VerdictLog,
     private val benchmark: PerformanceBenchmark,
     private val telemetry: TesterTelemetry,
 ) {
@@ -65,6 +66,11 @@ class HarnessController(
         CalibrationStats.of(samples, model.model.id)
     }.stateIn(scope, SharingStarted.Eagerly, CalibrationStats(emptyList(), emptyList()))
 
+    /** Right / wrong answers for the active model. */
+    val tally: StateFlow<VerdictTally> = combine(verdicts.verdicts, settings.active) { all, model ->
+        VerdictTally.of(all, model.model.id)
+    }.stateIn(scope, SharingStarted.Eagerly, VerdictTally())
+
     init {
         // The test app shows the aligned face crop; the real app never turns this on.
         diagnostics.captureAlignedFace = true
@@ -72,17 +78,11 @@ class HarnessController(
 
     // Tester data sharing (see harness/telemetry)
     val setup = telemetry.setup
-    val consent = telemetry.consent
     val uploads = telemetry.uploads
     val installId = telemetry.installId
-    val cropConsent = telemetry.cropConsent
     val sharingAvailable: Boolean get() = telemetry.available
 
-    fun setCropConsent(granted: Boolean) = telemetry.setCropConsent(granted)
-
     fun updateSetup(setup: TesterSetup) = telemetry.updateSetup(setup)
-
-    fun setConsent(granted: Boolean) = telemetry.setConsent(granted)
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -108,13 +108,26 @@ class HarnessController(
         }
     }
 
-    fun label(label: CheckLabel) {
+    /**
+     * The tester's verdict on the last check: was what the app did right? Counted for the active
+     * model, and when the check produced a score it also becomes a calibration sample: a right
+     * accept or a wrong refusal means the best person's score was a genuine one, anything else a stranger's.
+     */
+    fun answer(correct: Boolean) {
         val check = _lastCheck.value ?: return
-        val modelId = check.modelId ?: return
-        if (!check.labellable) return
-        val genuine = label is CheckLabel.Person && label.id == check.bestFaceId
-        _lastCheck.value = check.copy(labelled = true)
-        scope.launch { calibration.add(CalibrationSample(modelId, genuine, check.score)) }
+        if (!check.needsVerdict) return
+        val modelId = check.modelId ?: active.value?.model?.id ?: return
+        val matched = check.result.matched
+        _lastCheck.value = check.copy(answered = true)
+        scope.launch {
+            verdicts.add(Verdict(modelId, Outcome.of(matched, correct)))
+            if (check.scored) calibration.add(CalibrationSample(modelId, genuine = matched == correct, score = check.score))
+        }
+    }
+
+    fun clearVerdicts() {
+        val modelId = active.value?.model?.id ?: return
+        scope.launch { verdicts.clear(modelId) }
     }
 
     private val _bench = MutableStateFlow<BenchState>(BenchState.Idle)

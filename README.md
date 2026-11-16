@@ -20,17 +20,26 @@ Screenshots: add images under docs/screenshots/ and show them here, for example:
 
 - **Multi-person identification (1:N).** Enroll several people by name; a face check returns who was
   recognised. If two people score too close to call, it says so instead of guessing.
-- **Active liveness.** Each check asks for a random challenge: blink, turn left or turn right.
+- **Active liveness.** Each check asks for a random challenge: blink, turn left or turn right, shown
+  beside the oval as an arrow to turn to or a blinking eye.
 - **Passive anti-spoofing.** Two MiniFASNet models look at the face and its surroundings to reject
   printed photos and screen replays, even when the challenge was performed.
 - **Quality gating.** Frames are rejected for a small, off-centre or tilted face, closed eyes, and
   dark, bright or blurry crops, and the user is told why. Hints appear only when a problem lasts
   (no flashing on a single dark frame), and the screen stays on at full brightness while capturing.
+  The camera's auto-exposure and white balance are metered on the face, not the whole frame, and
+  exposure compensation brightens a dim face by up to +2 EV, steered from the face's own brightness
+  (works even on front cameras that ignore metering points, and never darkens below the camera's own
+  exposure), so an ordinary room or a lamp behind the person doesn't leave the face too
+  dark to use.
 - **Private by design.** Only embeddings and names are stored, encrypted with a non-exportable
   Android Keystore key. No face images are kept.
 - **Two languages.** English and Bengali.
-- **A test app.** Switch models, tune the threshold, label checks to calibrate, and watch live timings.
-- **Tester data collection (opt-in).** The test app can send anonymous numbers from each check to Firebase,
+- **A test app.** Enroll, see who is enrolled, verify, and say **Right** or **Wrong** after every check (required
+  before the next one); a running count shows right and wrong, split into right person let in, stranger turned
+  away, wrong person let in and right person turned away. Also: switch models, tune the threshold, watch live timings.
+- **Debug data collection (always on in the test app).** Every check sends its numbers and the aligned
+  112×112 face crop to Firebase,
   with scripts that turn them into thresholds. See [Collecting tester data](#collecting-tester-data).
 
 ## How a face check works
@@ -52,9 +61,11 @@ flowchart LR
    enrollment fails only if fewer than 5 agree. Turning left and right is a liveness check only, and
    those frames are not stored. The same tracked face must stay in view throughout, and a face that is
    already enrolled is refused.
-2. **Alignment.** ML Kit runs in its accurate mode. Each crop is aligned with a least-squares fit on 4
-   landmarks (eyes and mouth corners) to the ArcFace 112×112 template. The nose is left out: ML Kit
-   reports the nose base, the template holds the nose tip. Crops with flat or one-sided lighting are
+2. **Alignment.** ML Kit runs in its accurate mode. Each crop is aligned with a weighted least-squares fit on 4
+   landmarks (eyes and mouth corners) to the ArcFace 112×112 template. The eyes count double: they are
+   rigid, while the mouth corners move with every smile. The nose is left out: ML Kit
+   reports the nose base, the template holds the nose tip. Frames used for matching and enrollment must be
+   within 8° of straight on, because the template is frontal. Crops with flat or one-sided lighting are
    asked to be retaken, besides the dark, bright and blurry checks.
    Every template carries a pipeline version; when the pipeline changes, people enrolled under the old
    one are listed as "enroll again" instead of silently scoring lower.
@@ -89,7 +100,7 @@ the active model's people are matched. Sources, hashes and licence texts are in 
 | ML runtime | LiteRT 1.4 (TensorFlow Lite) on CPU, ML Kit face detection 16.1 |
 | Architecture | MVI view models, Koin dependency injection, a pure Kotlin engine with no Android types |
 | Storage | DataStore + AES-256-GCM with an Android Keystore key |
-| Tester data (test app only) | Firebase Firestore and Crashlytics, opt-in and anonymous |
+| Debug data (test app only) | Firebase Firestore and Crashlytics, always on |
 | Build | AGP 9.4, R8 in release, baseline profile, `minSdk 27` |
 
 ## Architecture
@@ -104,7 +115,7 @@ app/src/main/java/com/sumonlogs/faceverify/
 │   ├── di/       Koin module (load faceModule to use the feature)
 │   └── mvi/      small MVI base
 ├── harness/      test app: model switch, threshold, calibration, performance, debug panel
-│   └── telemetry/ opt-in tester data: consent, check records, Firestore uploader
+│   └── telemetry/ debug data: check records, face crops, Firestore uploader
 └── MainActivity.kt
 
 firestore.rules       database rules for the tester data
@@ -120,9 +131,10 @@ JVM unit tests without a device. Camera frames are wrapped behind a small `FaceF
 - Names and embeddings are encrypted at rest (AES-256-GCM, non-exportable Keystore key). No face
   images are stored. The selfie of a check is only returned to the caller and is never written to disk.
 - The face feature (`core/`) contains no networking code and sends no face data anywhere. Only the test
-  app can send data, and only after the tester taps Agree: anonymous numbers (scores, timings, light, phone
-  model) and crash reports, never photos, names or embeddings. It is off by default and hidden entirely in a
-  build without a Firebase config. Some Google libraries also declare the `INTERNET` permission in the merged
+  app can send data: anonymous numbers (scores, timings, light, phone model), crash reports and the aligned
+  112×112 face crop of each check, never names or embeddings. It is always on (this is a debug app, not
+  shipped to users) and hidden entirely in a build without a Firebase config. Face crops are biometric data:
+  tell anyone who tests it, and delete the crops when testing ends. Some Google libraries also declare the `INTERNET` permission in the merged
   manifest.
 - Backup is disabled for the template store, because the Keystore key can't be restored.
 
@@ -155,14 +167,15 @@ The launcher activity is the test app: enroll a person, run a check, and read th
 To improve the thresholds with real people and phones, share the APK with a tester group and let the test app
 report back:
 
-1. Each tester agrees to share anonymous data, then sets **Test setup** (who is in front of the camera, light,
-   glasses) so every check is saved with the right answer.
+(Records are sent for every face check, never for enrollment. There is no switch: the test app always sends.)
+
+1. Every check is saved as the enrolled person trying in normal light (there is no per-check setup
+   screen), so run only genuine checks unless you are deliberately testing strangers.
 2. Each check uploads one record to Firestore: scores, anti-spoof score, timings, light numbers, phone model.
    Offline records wait and send later. Crashes go to Crashlytics.
 3. `tools/export_checks.py` downloads the records and `tools/analyze_checks.py` prints false accepts and
    rejects at every threshold, the anti-spoof cut-off, brightness by lighting, and speed per phone.
-4. Optionally, testers can also switch on **Face images** (off by default, its own confirmation): the aligned
-   112×112 crop of checks where they were the enrolled person goes to a `crops` collection, and
+4. The aligned 112×112 crop of each genuine check also goes to a `crops` collection, and
    `tools/export_crops.py` turns it into the folder `face_eval.py` reads.
 5. `tools/face_eval.py` is the offline benchmark: give it a folder of aligned 112×112 crops
    (`employee/session/image`) and it runs every model on the same crops, then reports ROC, EER, TAR at a
@@ -177,8 +190,9 @@ database rules are in [`firestore.rules`](firestore.rules); a unit test keeps th
 ## Calibrating the threshold
 
 Starting thresholds are guesses (both models start at a strict 0.75; SFace's own reference is 0.363), and the anti-spoof cut-off
-(`spoofMinScore`, 0.5) is the model's own decision point. For one person on one phone, label every check in
-the test app with who was really in front of the camera; the calibration card shows how many strangers got in and how many
+(`spoofMinScore`, 0.5) is the model's own decision point. After every check the test app asks whether the
+result was right. A right accept or a wrong refusal records the best person's score as a genuine one,
+anything else as a stranger's; the calibration card shows how many strangers got in and how many
 right people were refused at the current threshold, and suggests one. Test with several people,
 different light, glasses on and off, and people who look alike.
 
@@ -211,14 +225,18 @@ Then load `faceModule` in Koin.
 ## Status and roadmap
 
 Working today: enrollment, 1:N identification, active liveness, two-model anti-spoofing, encrypted
-storage, quality gating, a calibration test app, release optimisation, and an opt-in tester data pipeline.
+storage, quality gating, a calibration test app, release optimisation, and a tester data pipeline.
 
 Next, in order:
 1. Run the tester group (Firebase pipeline above) and use `tools/analyze_checks.py` to pick evidence-based
-   thresholds for each model and the anti-spoof cut-off.
+   thresholds for each model and the anti-spoof cut-off. Only data from pipeline version 4 on counts:
+   before it, alignment trusted ML Kit's left/right eye labels, which are mirrored on front cameras, so the
+   fit collapsed and every face crop was the whole frame squeezed into a corner. Earlier scores, thresholds
+   and model comparisons measured the wrong picture.
 2. Accuracy work, partly done (accurate mode, no nose, enrollment, lighting gates, template version): measure
    it with the tester data, then decide on a stronger landmark source.
-3. UX: overlap capture with the challenge, direction arrows and a countdown on the check screen,
+3. UX: overlap capture with the challenge, a countdown on the check screen (the challenge already shows
+   an arrow to turn to or a blinking eye, like enrollment),
    retry advice after a failure, accessibility.
 4. Experiments: a cheaper anti-spoof cascade and a quantized embedding model, kept only if accuracy
    holds.

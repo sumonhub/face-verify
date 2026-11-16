@@ -3,11 +3,13 @@ package com.sumonlogs.faceverify.core.ui.facecheck
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +33,9 @@ import com.sumonlogs.faceverify.core.api.FaceMatchResult
 import com.sumonlogs.faceverify.core.ui.camera.FaceCameraPreview
 import com.sumonlogs.faceverify.core.ui.components.DarkFaceBoard
 import com.sumonlogs.faceverify.core.ui.components.DarkHeader
+import com.sumonlogs.faceverify.core.ui.components.FaceGlyph
 import com.sumonlogs.faceverify.core.ui.components.FaceHeadline
+import com.sumonlogs.faceverify.core.ui.components.FaceIcon
 import com.sumonlogs.faceverify.core.ui.components.FaceOval
 import com.sumonlogs.faceverify.core.ui.components.FaceOvalPlaceholder
 import com.sumonlogs.faceverify.core.ui.components.KeepScreenOn
@@ -37,6 +44,7 @@ import com.sumonlogs.faceverify.core.ui.components.StepBar
 import com.sumonlogs.faceverify.core.ui.permission.CameraPermissionGate
 import com.sumonlogs.faceverify.core.ui.theme.FaceColors
 import com.sumonlogs.faceverify.core.ui.theme.FaceTypography
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -83,16 +91,18 @@ fun FaceCheckScreen(
             closeDescription = stringResource(R.string.face_cd_cancel_check),
             onClose = onClose,
         )
-        FaceOval(
-            width = 250.dp,
-            height = 330.dp,
-            progress = state.ringProgress,
-            ringColor = if (state.ringTone == RingTone.Failure) FaceColors.MismatchRed else FaceColors.Mint,
-            overlay = if (state.ringTone == RingTone.Failure) FaceColors.MismatchTint else null,
-            modifier = Modifier.padding(top = 52.dp),
-        ) {
-            FaceOvalPlaceholder(iconSize = 96.dp)
-            camera()
+        Box(Modifier.padding(top = 52.dp)) {
+            FaceOval(
+                width = 250.dp,
+                height = 330.dp,
+                progress = state.ringProgress,
+                ringColor = if (state.ringTone == RingTone.Failure) FaceColors.MismatchRed else FaceColors.Mint,
+                overlay = if (state.ringTone == RingTone.Failure) FaceColors.MismatchTint else null,
+            ) {
+                FaceOvalPlaceholder(iconSize = 96.dp)
+                camera()
+            }
+            ChallengeCue(state.prompt)
         }
         Column(
             Modifier.padding(top = 30.dp),
@@ -123,6 +133,41 @@ fun FaceCheckScreen(
         )
     }
 }
+
+/**
+ * Shows the liveness challenge beside the oval, the same way enrollment shows its poses: an arrow on
+ * the side to turn to, or an eye above the oval that blinks.
+ */
+@Composable
+private fun BoxScope.ChallengeCue(prompt: FacePrompt) {
+    when (prompt) {
+        FacePrompt.TurnLeft -> FaceIcon(
+            FaceGlyph.Back, null, 44.dp, 2.2f, FaceColors.Sky,
+            Modifier.align(Alignment.CenterStart).offset(x = (-54).dp),
+        )
+        FacePrompt.TurnRight -> FaceIcon(
+            FaceGlyph.Forward, null, 44.dp, 2.2f, FaceColors.Sky,
+            Modifier.align(Alignment.CenterEnd).offset(x = 54.dp),
+        )
+        FacePrompt.Blink -> {
+            var closed by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(if (closed) BLINK_CLOSED_MS else BLINK_OPEN_MS)
+                    closed = !closed
+                }
+            }
+            FaceIcon(
+                if (closed) FaceGlyph.EyeClosed else FaceGlyph.EyeOpen, null, 40.dp, 2.2f, FaceColors.Sky,
+                Modifier.align(Alignment.TopCenter).offset(y = (-46).dp),
+            )
+        }
+        else -> Unit
+    }
+}
+
+private const val BLINK_OPEN_MS = 900L
+private const val BLINK_CLOSED_MS = 250L
 
 private fun FacePrompt.texts(): Pair<Int, Int> {
     @StringRes val keepInOval = R.string.face_sub_keep_in_oval
@@ -161,6 +206,12 @@ private fun FacePrompt.texts(): Pair<Int, Int> {
 @Composable
 private fun FaceCheckBlinkPreview() {
     FaceCheckScreen(FaceCheckState(step = 2, prompt = FacePrompt.Blink, ringProgress = 0.66f), onClose = {})
+}
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun FaceCheckTurnLeftPreview() {
+    FaceCheckScreen(FaceCheckState(step = 2, prompt = FacePrompt.TurnLeft, ringProgress = 0.4f), onClose = {})
 }
 
 @Preview(widthDp = 390, heightDp = 844)

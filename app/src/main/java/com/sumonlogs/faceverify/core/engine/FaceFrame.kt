@@ -16,7 +16,10 @@ data class FaceObservation(
     val roll: Float,
     val leftEyeOpen: Float?,
     val rightEyeOpen: Float?,
-    /** Landmarks use the person's own left / right (so [leftEye] appears on the image's right). */
+    /**
+     * Landmarks as ML Kit labels them. Don't rely on which side "left" is: on a front camera the labels
+     * come out mirrored. Alignment orders the points by their image position instead.
+     */
     val leftEye: Point?,
     val rightEye: Point?,
     val noseBase: Point? = null,

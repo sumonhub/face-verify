@@ -56,7 +56,7 @@ data class CalibrationStats(val genuine: List<Float>, val impostor: List<Float>)
     }
 }
 
-private val Context.harnessDataStore by preferencesDataStore(name = "harness")
+internal val Context.harnessDataStore by preferencesDataStore(name = "harness")
 
 /** Keeps the labelled samples on this phone (harness only). */
 class CalibrationLog(private val context: Context) {
